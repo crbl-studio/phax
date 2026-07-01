@@ -91,7 +91,6 @@ export function registerWsHandlers(server: Server, username: string): void {
   });
 
   server.registerEventHandler("tempdraw", (data) => {
-    if (data.layer !== gs.selectedLayer) return;
     let ip = gs.inProgress.get(data.layer);
     if (!ip) {
       ip = new SvelteMap();

@@ -40,7 +40,11 @@ export class MoveTool extends BaseTool {
         map = new SvelteMap();
         gs.inProgress.set(gs.selectedLayer, map);
       }
-      map.set(instructionBox.uuid, { username: gs.username, layer: gs.selectedLayer, instructionBox });
+      map.set(instructionBox.uuid, {
+        username: gs.username,
+        layer: gs.selectedLayer,
+        instructionBox,
+      });
       const motion = instructionBox.instruction as Motion;
       gs.server?.sendMoveStart(
         instructionBox.uuid,

@@ -1,7 +1,7 @@
 import { BaseTool } from ".";
 import { gs } from "$lib/state.svelte";
 import { ToolType } from "../types";
-  import { v4 as uuid } from "uuid";
+import { v4 as uuid } from "uuid";
 
 export class BucketTool extends BaseTool {
   public onmousedown(event: MouseEvent, element: HTMLElement) {

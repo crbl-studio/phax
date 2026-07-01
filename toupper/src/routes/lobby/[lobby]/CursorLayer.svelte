@@ -11,7 +11,7 @@
     context.clearRect(0, 0, gs.drawing.width, gs.drawing.height);
 
     gs.cursors.entries().forEach((v) => {
-      renderTool(context, v[1], v[0]);
+      renderTool(context, gs.ratio, v[1], v[0]);
     });
 
     gs.selections.entries().forEach((v) => {
@@ -21,6 +21,7 @@
     if (gs.cursorPosition) {
       renderTool(
         context,
+        gs.ratio,
         {
           tool: getStateTool(gs),
           point: gs.cursorPosition,

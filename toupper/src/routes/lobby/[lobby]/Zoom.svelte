@@ -28,7 +28,12 @@
           200,
         );
         if (gs.tool) {
-          renderTool(context, { point: gs.cursorPosition, tool: getStateTool(gs)! }, null);
+          renderTool(
+            context,
+            gs.ratio,
+            { point: gs.cursorPosition, tool: getStateTool(gs)! },
+            null,
+          );
         }
       }
       req = requestAnimationFrame(loop);

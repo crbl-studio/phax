@@ -55,7 +55,6 @@ export class Renderer {
       updates = true;
     }
     if (!updates) return;
-    console.log("render", new Date());
     const w = this.drawing.width;
     const h = this.drawing.height;
     if (this.canvas.width !== w) this.canvas.width = w;
@@ -67,21 +66,26 @@ export class Renderer {
       const layer = this.drawing.layers.get(layerName);
       if (!layer || !layer.visible) continue;
 
-      await this.ensureLayerContext(layerName, layer.historyIndex);
+      const canvas = new OffscreenCanvas(this.drawing.width, this.drawing.height);
+      const context = canvas.getContext("2d")!;
 
-      const canvas = this.getCanvas(layerName, layer.historyIndex);
-      if (canvas) {
-        const context = canvas.getContext("2d")!;
-        const inProgress = this.inProgress.get(layerName);
-        if (inProgress) {
-          for (const [, entry] of inProgress) {
-            if (entry.instructionBox.applied) {
-              await applyInstruction(entry.instructionBox.instruction, context, this.imageCache);
-            }
+      await this.ensureLayerContext(layerName, layer.historyIndex);
+      const historyCanvas = this.getCanvas(layerName, layer.historyIndex);
+      if (historyCanvas) {
+        context.drawImage(historyCanvas, 0, 0);
+      }
+
+      const inProgress = this.inProgress.get(layerName);
+      console.log({ inProgress, layerName });
+      if (inProgress) {
+        for (const entry of inProgress.values()) {
+          if (entry.instructionBox.applied) {
+            await applyInstruction(entry.instructionBox.instruction, context, this.imageCache);
           }
         }
-        this.ctx.drawImage(canvas, 0, 0);
       }
+
+      this.ctx.drawImage(canvas, 0, 0);
     }
 
     this.lastRenderMetadataHash = drawingMetadataHash;

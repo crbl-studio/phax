@@ -2,30 +2,45 @@ import type { Brush, Point } from "$lib/drinfo";
 import { type Cursor, ToolType } from "$lib/types";
 
 const renderSelectionCursor = (
-  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  cursorContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  ratio: number,
   point: Point,
   username: string | null,
 ) => {
-  context.lineWidth = 2;
-  context.strokeStyle = "#000000";
+  cursorContext.lineWidth = 4 * ratio;
+  cursorContext.strokeStyle = "#ffffff";
 
-  context.beginPath();
-  context.moveTo(point.x - 12, point.y);
-  context.lineTo(point.x + 12, point.y);
-  context.stroke();
+  cursorContext.beginPath();
+  cursorContext.moveTo(point.x - 11 * ratio, point.y);
+  cursorContext.lineTo(point.x + 11 * ratio, point.y);
+  cursorContext.stroke();
 
-  context.beginPath();
-  context.moveTo(point.x, point.y - 12);
-  context.lineTo(point.x, point.y + 12);
-  context.stroke();
+  cursorContext.beginPath();
+  cursorContext.moveTo(point.x, point.y - 11 * ratio);
+  cursorContext.lineTo(point.x, point.y + 11 * ratio);
+  cursorContext.stroke();
+
+  cursorContext.lineWidth = 2 * ratio;
+  cursorContext.strokeStyle = "#000000";
+
+  cursorContext.beginPath();
+  cursorContext.moveTo(point.x - 10 * ratio, point.y);
+  cursorContext.lineTo(point.x + 10 * ratio, point.y);
+  cursorContext.stroke();
+
+  cursorContext.beginPath();
+  cursorContext.moveTo(point.x, point.y - 10 * ratio);
+  cursorContext.lineTo(point.x, point.y + 10 * ratio);
+  cursorContext.stroke();
 
   if (username !== null) {
-    renderUsername(context, { x: point.x + 5, y: point.y + 5 }, username);
+    renderUsername(cursorContext, { x: point.x + 5, y: point.y + 5 }, username);
   }
 };
 
 const renderStrokeCursor = (
-  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  cursorContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  ratio: number,
   point: Point | undefined,
   brush: Brush,
   username: string | null,
@@ -33,25 +48,84 @@ const renderStrokeCursor = (
   if (!point) {
     return;
   }
-  context.lineWidth = 1;
-  context.beginPath();
-  context.strokeStyle = brush.color;
-  if (brush.brushShape.shape === "circle") {
-    context.arc(point.x, point.y, brush.width / 2, 0, 2 * Math.PI);
-  } else if (brush.brushShape.shape === "square") {
-    context.strokeRect(
-      point.x - brush.width / 2,
-      point.y - brush.width / 2,
-      brush.width,
-      brush.width,
-    );
+  cursorContext.setLineDash([]);
+  if (brush.width * ratio < 20 && brush.brushShape.shape === "circle") {
+    cursorContext.lineWidth = 4 * ratio;
+    cursorContext.strokeStyle = "#ffffff";
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x - 12 * ratio - brush.width / 2, point.y);
+    cursorContext.lineTo(point.x - 3 * ratio - brush.width / 2, point.y);
+    cursorContext.stroke();
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x, point.y - 12 * ratio - brush.width / 2);
+    cursorContext.lineTo(point.x, point.y - 3 * ratio - brush.width / 2);
+    cursorContext.stroke();
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x + 12 * ratio + brush.width / 2, point.y);
+    cursorContext.lineTo(point.x + 3 * ratio + brush.width / 2, point.y);
+    cursorContext.stroke();
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x, point.y + 12 * ratio + brush.width / 2);
+    cursorContext.lineTo(point.x, point.y + 3 * ratio + brush.width / 2);
+    cursorContext.stroke();
+
+    cursorContext.lineWidth = 2 * ratio;
+    cursorContext.strokeStyle = "#000000";
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x - 11 * ratio - brush.width / 2, point.y);
+    cursorContext.lineTo(point.x - 4 * ratio - brush.width / 2, point.y);
+    cursorContext.stroke();
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x, point.y - 11 * ratio - brush.width / 2);
+    cursorContext.lineTo(point.x, point.y - 4 * ratio - brush.width / 2);
+    cursorContext.stroke();
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x + 11 * ratio + brush.width / 2, point.y);
+    cursorContext.lineTo(point.x + 4 * ratio + brush.width / 2, point.y);
+    cursorContext.stroke();
+
+    cursorContext.beginPath();
+    cursorContext.moveTo(point.x, point.y + 11 * ratio + brush.width / 2);
+    cursorContext.lineTo(point.x, point.y + 4 * ratio + brush.width / 2);
+    cursorContext.stroke();
   }
+  const drawCursor = () => {
+    if (brush.brushShape.shape === "circle") {
+      cursorContext.lineWidth = 1 * ratio;
+      cursorContext.beginPath();
+      cursorContext.arc(point.x, point.y, brush.width / 2, 0, 2 * Math.PI);
+      cursorContext.stroke();
+    } else if (brush.brushShape.shape === "square") {
+      cursorContext.lineWidth = 1 * ratio;
+      cursorContext.beginPath();
+      cursorContext.strokeRect(
+        point.x - brush.width / 2,
+        point.y - brush.width / 2,
+        brush.width,
+        brush.width,
+      );
+      cursorContext.stroke();
+    }
+  };
+  cursorContext.setLineDash([]);
+  cursorContext.strokeStyle = "#000000";
+  drawCursor();
+  cursorContext.setLineDash([5, 5]);
+  cursorContext.strokeStyle = "#ffffff";
+  drawCursor();
   if (username !== null) {
     const offset =
       brush.brushShape.shape === "square" ? brush.width / 2 + 10 : Math.max(brush.width / 2, 15);
-    renderUsername(context, { x: point.x + offset, y: point.y + offset }, username);
+    renderUsername(cursorContext, { x: point.x + offset, y: point.y + offset }, username);
   }
-  context.stroke();
+  cursorContext.setLineDash([]);
 };
 
 const renderUsername = (
@@ -65,14 +139,15 @@ const renderUsername = (
 };
 
 export const renderTool = (
-  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  cursorContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  ratio: number,
   cursor: Cursor | null,
   username: string | null,
 ) => {
   if (cursor?.tool?.type === ToolType.Stroke || cursor?.tool?.type === ToolType.Eraser) {
-    renderStrokeCursor(context, cursor.point, cursor.tool.brush, username);
+    renderStrokeCursor(cursorContext, ratio, cursor.point, cursor.tool.brush, username);
   } else if (cursor) {
-    renderSelectionCursor(context, cursor.point, username);
+    renderSelectionCursor(cursorContext, ratio, cursor.point, username);
   }
 };
 
