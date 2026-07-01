@@ -2,6 +2,7 @@
   import { type InstructionBox } from "$lib/drinfo";
   import LayersPaneLayer from "./LayersPaneLayer.svelte";
   import { gs } from "$lib/state.svelte";
+  import { v4 as uuid } from "uuid";
 
   const getNextLayerName = () => {
     let possible = `New layer ${gs.drawing.layerOrder.length + 1}`;
@@ -48,7 +49,7 @@
             ];
             const instructionCopy: InstructionBox = {
               instruction: instruction.instruction,
-              uuid: crypto.randomUUID(),
+              uuid: uuid(),
               applied: instruction.applied,
             };
             gs.server?.instructionBox(instructionCopy, layer);

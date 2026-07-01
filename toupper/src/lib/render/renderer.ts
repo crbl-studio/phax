@@ -2,6 +2,7 @@ import type { Drawing, InstructionBox } from "$lib/drinfo";
 import type { InProgressEntry } from "$lib/state.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import { applyInstruction } from "./instruction";
+import { v4 as uuid } from "uuid";
 
 export type SnapshotCallback = (layer: string, data: string, index: number) => void;
 
@@ -135,7 +136,7 @@ export class Renderer {
 
     if (!contexts.has(0)) {
       const ctx = new OffscreenCanvas(w, h).getContext("2d")!;
-      contexts.set(0, { canvas: ctx.canvas, renderID: crypto.randomUUID() });
+      contexts.set(0, { canvas: ctx.canvas, renderID: uuid() });
     }
 
     if (targetIndex === 0) return;
@@ -151,7 +152,7 @@ export class Renderer {
       const ctx = new OffscreenCanvas(w, h).getContext("2d")!;
       ctx.clearRect(0, 0, w, h);
       ctx.drawImage(image, 0, 0);
-      contexts.set(snapshot[0], { canvas: ctx.canvas, renderID: crypto.randomUUID() });
+      contexts.set(snapshot[0], { canvas: ctx.canvas, renderID: uuid() });
       currentIndex = snapshot[0];
     }
 
@@ -198,7 +199,7 @@ export class Renderer {
         }
       }
 
-      contexts.set(current, { canvas: newCanvas, renderID: crypto.randomUUID() });
+      contexts.set(current, { canvas: newCanvas, renderID: uuid() });
 
       if (current % SNAPSHOT_INTERVAL === 0 && this.onSnapshot) {
         const blob = await newCanvas.convertToBlob();

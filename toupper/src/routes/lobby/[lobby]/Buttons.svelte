@@ -14,6 +14,7 @@
   import { MoveTool } from "$lib/tools/move";
   import { translateSelection } from "$lib/util";
   import { SvelteMap } from "svelte/reactivity";
+  import { v4 as uuid } from "uuid";
 
   let saveUrl = $state("");
 
@@ -51,7 +52,7 @@
               },
               rotate: 0,
             },
-            uuid: crypto.randomUUID(),
+            uuid: uuid(),
           };
           let map = gs.inProgress.get(gs.selectedLayer);
           if (!map) {

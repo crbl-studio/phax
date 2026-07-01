@@ -15,8 +15,9 @@
   import PreviewLayer from "./PreviewLayer.svelte";
   import BgCanvas from "./BgCanvas.svelte";
   import { getRatio } from "$lib/util";
+  import { v4 as uuid } from "uuid";
 
-  let username = page.params.lobby ?? crypto.randomUUID();
+  let username = page.params.lobby ?? uuid();
 
   $effect(() => {
     gs.username = username;

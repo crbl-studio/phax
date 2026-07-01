@@ -1,6 +1,7 @@
 import { BaseTool } from ".";
 import { gs } from "$lib/state.svelte";
 import { ToolType } from "../types";
+  import { v4 as uuid } from "uuid";
 
 export class BucketTool extends BaseTool {
   public onmousedown(event: MouseEvent, element: HTMLElement) {
@@ -15,7 +16,7 @@ export class BucketTool extends BaseTool {
           brush: gs.brush,
           tolerance: gs.tolerance,
         },
-        uuid: crypto.randomUUID(),
+        uuid: uuid(),
         applied: true,
       },
       gs.selectedLayer,

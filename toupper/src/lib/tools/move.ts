@@ -4,6 +4,7 @@ import { gs } from "$lib/state.svelte";
 import { ToolType } from "../types";
 import { SvelteMap } from "svelte/reactivity";
 import { applyTransform } from "./transform";
+import { v4 as uuid } from "uuid";
 
 function selectionCenter(selection: Point[]): Point {
   let cx = 0;
@@ -23,10 +24,9 @@ export class MoveTool extends BaseTool {
     super.onmousedown(event, element);
     if ((gs.selections.get(gs.username)?.points.length ?? 0) >= 3 && gs.selectedLayer !== null) {
       if (gs.currentUuid) return;
-      const uuid = crypto.randomUUID();
       const instructionBox = {
         applied: true,
-        uuid,
+        uuid: uuid(),
         instruction: {
           selection: gs.selections.get(gs.username)!.points,
           end: gs.selections.get(gs.username)!.points[0],
@@ -34,16 +34,16 @@ export class MoveTool extends BaseTool {
           rotate: 0,
         },
       };
-      gs.currentUuid = uuid;
+      gs.currentUuid = instructionBox.uuid;
       let map = gs.inProgress.get(gs.selectedLayer);
       if (!map) {
         map = new SvelteMap();
         gs.inProgress.set(gs.selectedLayer, map);
       }
-      map.set(uuid, { username: gs.username, layer: gs.selectedLayer, instructionBox });
+      map.set(instructionBox.uuid, { username: gs.username, layer: gs.selectedLayer, instructionBox });
       const motion = instructionBox.instruction as Motion;
       gs.server?.sendMoveStart(
-        uuid,
+        instructionBox.uuid,
         gs.selectedLayer,
         motion.selection,
         motion.end,

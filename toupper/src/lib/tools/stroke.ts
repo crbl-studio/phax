@@ -3,6 +3,7 @@ import { BaseTool } from ".";
 import { gs } from "$lib/state.svelte";
 import { ToolType } from "../types";
 import { SvelteMap } from "svelte/reactivity";
+import { v4 as uuid } from "uuid";
 
 export class StrokeTool extends BaseTool {
   private lastPoint: Point | null = null;
@@ -37,7 +38,7 @@ export class StrokeTool extends BaseTool {
     if (event.button !== 0) return;
     if (!gs.selectedLayer) return;
     const instructionBox = {
-      uuid: crypto.randomUUID(),
+      uuid: uuid(),
       applied: true,
       instruction: {
         points: [],
