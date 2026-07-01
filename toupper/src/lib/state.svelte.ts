@@ -18,8 +18,6 @@ interface GlobalState {
   brush: Brush;
   secondaryBrush: Brush;
   ratio: number;
-  zoom: boolean;
-  zoomRatio: number;
   server: Server | null;
   selectedLayer: string | null;
   bg: boolean;
@@ -43,8 +41,6 @@ export const gs: GlobalState = $state({
   brush: getDefaultBrush(),
   secondaryBrush: getSecondaryDefaultBrush(),
   ratio: 0,
-  zoom: false,
-  zoomRatio: 2,
   server: null,
   selectedLayer: null,
   bg: true,

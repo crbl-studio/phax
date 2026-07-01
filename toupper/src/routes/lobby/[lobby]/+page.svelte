@@ -7,7 +7,6 @@
   import LayersPane from "./LayersPane.svelte";
   import { gs } from "$lib/state.svelte";
   import { registerWsHandlers } from "$lib/ws-handlers.svelte";
-  import Zoom from "./Zoom.svelte";
   import ToolSettings from "./toolsettings/ToolSettings.svelte";
   import { page } from "$app/state";
   import Canvas from "./Canvas.svelte";
@@ -126,9 +125,6 @@
       <div>W: {gs.drawing.width}</div>
     </div>
   </div>
-  {#if gs.zoom}
-    <Zoom />
-  {/if}
 </div>
 
 <style>
