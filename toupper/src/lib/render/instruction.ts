@@ -45,15 +45,24 @@ const getPointOnSegment = (a: Point, b: Point, distance: number): Point => {
   };
 };
 
-export const stroke = (
+export type StrokeResumeState = {
+  lastDrawDistance: number;
+  segmentIndex: number;
+  segmentStartDistance: number;
+  pointCount: number;
+};
+
+export const resumeStroke = (
   stroke: Stroke,
   context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-) => {
+  state: StrokeResumeState,
+): StrokeResumeState => {
   if (!context) {
     console.warn("No context for draw.");
-    return;
+    return state;
   }
-  if (stroke.points.length === 0) return;
+  if (stroke.points.length === 0) return state;
+
   if (stroke.brush.erase) {
     context.globalCompositeOperation = "destination-out";
   } else {
@@ -61,49 +70,61 @@ export const stroke = (
   }
 
   const brushImage = generateShape(stroke.brush);
-
-  let totalDistance = 0;
-  for (let i = 0; i < stroke.points.length - 1; i++) {
-    totalDistance += getDistance(stroke.points[i], stroke.points[i + 1]);
-  }
-
-  context.drawImage(
-    brushImage,
-    stroke.points[0].x - stroke.brush.width / 2,
-    stroke.points[0].y - stroke.brush.width / 2,
-  );
-
-  let walkedDistance = 0;
-  let lastDrawDistance = 0;
-  let position;
-  let index = 0;
   const spacing = Math.max((stroke.brush.repeat * stroke.brush.width) / (2 ** 32 - 1), 1);
-  while (walkedDistance < totalDistance) {
-    for (let i = index; i < stroke.points.length - 1; i++) {
-      index = i;
-      const pointsDistance = Math.max(getDistance(stroke.points[i], stroke.points[i + 1]), 1);
-      if (walkedDistance + pointsDistance >= lastDrawDistance + spacing) {
-        break;
-      }
-      walkedDistance += pointsDistance;
-    }
-    if (index === stroke.points.length - 2 && lastDrawDistance + spacing !== totalDistance) {
-      context.globalCompositeOperation = "source-over";
-      return;
-    }
-    position = getPointOnSegment(
-      stroke.points[index],
-      stroke.points[index + 1],
-      lastDrawDistance + spacing - walkedDistance,
-    );
+
+  if (state.pointCount === 0) {
     context.drawImage(
       brushImage,
-      position.x - stroke.brush.width / 2,
-      position.y - stroke.brush.width / 2,
+      stroke.points[0].x - stroke.brush.width / 2,
+      stroke.points[0].y - stroke.brush.width / 2,
     );
-    lastDrawDistance += spacing;
   }
+
+  let nextDrawDistance = state.lastDrawDistance + spacing;
+  let segStart = state.segmentStartDistance;
+  let segmentIndex = state.segmentIndex;
+
+  for (let i = segmentIndex; i < stroke.points.length - 1; i++) {
+    const segLen = Math.max(getDistance(stroke.points[i], stroke.points[i + 1]), 1);
+    const segEnd = segStart + segLen;
+
+    while (nextDrawDistance <= segEnd) {
+      const position = getPointOnSegment(
+        stroke.points[i],
+        stroke.points[i + 1],
+        nextDrawDistance - segStart,
+      );
+      context.drawImage(
+        brushImage,
+        position.x - stroke.brush.width / 2,
+        position.y - stroke.brush.width / 2,
+      );
+      nextDrawDistance += spacing;
+    }
+
+    segStart = segEnd;
+    segmentIndex = i + 1;
+  }
+
   context.globalCompositeOperation = "source-over";
+  return {
+    lastDrawDistance: nextDrawDistance - spacing,
+    segmentIndex,
+    segmentStartDistance: segStart,
+    pointCount: stroke.points.length,
+  };
+};
+
+export const stroke = (
+  stroke: Stroke,
+  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+) => {
+  resumeStroke(stroke, context, {
+    lastDrawDistance: 0,
+    segmentIndex: 0,
+    segmentStartDistance: 0,
+    pointCount: 0,
+  });
 };
 
 const traceSelection = (
