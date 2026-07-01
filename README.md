@@ -23,18 +23,17 @@ fax has many features, including:
 - multiple brushes
 - saving and reopening a drawing
 - eraser
-- zoom
 - image insertion
+- selection tool
+- history editing
 
 ### Planned
 
 fax also has some planned features:
 
-- selection tool
 - file optimization
-- layer export
 
 ## Set up
 
-1. Go to `tolower` and run `cargo run --release`
-1. Go to `toupper` and run `pnpm i && pnpm run dev`
+1. Run `cargo run --release`
+1. Run `pnpm i && pnpm run dev`
