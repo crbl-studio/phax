@@ -21,13 +21,11 @@ export class Renderer {
     string,
     Map<number, { canvas: OffscreenCanvas; renderID: string }>
   >();
-  // Persistent scratch canvas per layer: history + everything stamped for in-progress
-  // entries. Kept across renders so strokes can be resumed with only the new tail.
+  // Rendered layer + in progress instructions.
   private scratchCanvases = new Map<string, OffscreenCanvas>();
-  // renderID of the history canvas the scratch was last built from. A mismatch forces
-  // a reinit (history advanced, snapshot swapped, resize, invalidateFrom, etc.).
+  // renderID of the history canvas the scratch was last built from.
   private scratchSourceRenderID = new Map<string, string>();
-  // Layer => UUID => resume state, only for strokes/erasers.
+  // Layer => UUID => resume state
   private strokeResumeStates = new Map<string, Map<string, StrokeResumeState>>();
   // Layer => UUID => hash of instruction at time of last render
   private inProgressHashes = new Map<string, Map<string, string>>();
@@ -140,16 +138,12 @@ export class Renderer {
             const prev = states.get(uuid);
             const newLen = instruction.points.length;
             if (prev && newLen === prev.pointCount) {
-              // Stroke unchanged since last render; already baked into scratch.
               continue;
             }
             if (prev && newLen > prev.pointCount) {
-              // Append-only: resume from stored state.
               const next = resumeStroke(instruction, scratchCtx, prev);
               states.set(uuid, next);
             } else {
-              // First render, or scratch was just reinit'd (so prev state is stale).
-              // Re-stamp from the path origin onto the fresh scratch.
               const next = resumeStroke(instruction, scratchCtx, {
                 lastDrawDistance: 0,
                 segmentIndex: 0,
@@ -159,8 +153,6 @@ export class Renderer {
               states.set(uuid, next);
             }
           } else {
-            // Non-stroke instructions always force a reinit (handled in getScratchFor),
-            // so the scratch is freshly built from history here; apply once for this frame.
             await applyInstruction(instruction, scratchCtx, this.imageCache);
           }
         }
@@ -202,8 +194,6 @@ export class Renderer {
     for (const key of keysToDelete) {
       layerHistory.delete(key);
     }
-    // History will be rebuilt with new renderIDs on next ensureLayerContext, so the
-    // existing scratch is no longer backed by the right history canvas.
     this.scratchCanvases.delete(layer);
     this.scratchSourceRenderID.delete(layer);
     this.strokeResumeStates.delete(layer);
@@ -222,11 +212,6 @@ export class Renderer {
     if (!existing || existing.width !== w || existing.height !== h) needsReinit = true;
     if (this.scratchSourceRenderID.get(layerName) !== historyRenderID) needsReinit = true;
 
-    // Non-stroke in-progress entries can't be incrementally resumed (meeting a being-moved
-    // selection, a freshly filled bucket, etc.), so they force a full redraw from history.
-    // Also detect non-append stroke mutations: any stroke whose point count went *down*
-    // means the path was replaced, not appended — re-stamping onto the existing scratch
-    // would double-stamp, so we reinit.
     if (inProgress && !needsReinit) {
       const states = this.strokeResumeStates.get(layerName);
       for (const [uuid, entry] of inProgress) {
@@ -256,7 +241,6 @@ export class Renderer {
     if (historyCanvas) ctx.drawImage(historyCanvas, 0, 0);
     this.scratchCanvases.set(layerName, canvas);
     this.scratchSourceRenderID.set(layerName, historyRenderID);
-    // Scratch was rebuilt from history; any prior stroke resume states are stale.
     this.strokeResumeStates.set(layerName, new Map());
     return canvas;
   }
