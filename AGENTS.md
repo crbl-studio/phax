@@ -6,7 +6,7 @@
 - `tolower/` — Rust axum WebSocket server (the backend). Depends on `drawing` via `path = "../drinfo"`.
 - `toupper/` — SvelteKit + Svelte 5 frontend (the client).
 
-The names are a play on case: "lower"/"upper" = server/client side. `pnpm-workspace.yaml` in `toupper/` is **not** a multi-package workspace — it only allows esbuild to build.
+The names are a play on case: "lower"/"upper" = server/client side. `pnpm-workspace.yaml` at the repo root is **not** a multi-package workspace — it only allows esbuild to build and only lists `toupper` as a package.
 
 ## Development commands
 
@@ -36,7 +36,7 @@ When changing messages, update **all three** in lockstep:
 3. `toupper/src/lib/tolower/type-converter/{to,from}-server.ts` (`ToServer` / `FromServer` converter classes bridge Rust `snake_case` + PascalCase enum variants ↔ TS `camelCase`).
 
 Gotchas:
-- `CursorOut`, `Init`, and `Join` are server-only; the server explicitly ignores them when received (`tolower/src/routes/ws.rs`).
+- `Cursor`, `Init`, and `Join` are server-only (they exist only in `WebSocketServerMessage`, not in `WebSocketClientMessage`); `KeepAlive` is client-only and handled as a no-op in `tolower/src/routes/ws.rs`.
 - `RequestInit` is sent as the **bare JSON string** `"RequestInit"`, not a wrapped object (see `toupper/src/lib/tolower/server.ts`).
 
 ### History indexing is 1-based
@@ -47,12 +47,28 @@ Both `drinfo/src/layer.rs` and `toupper/src/lib/drinfo/drawing.svelte.ts` use 1-
 
 Drawings persist as **CBOR** via `ciborium` (extension `.drinfo`). Saved via `GET /save` (`tolower/src/routes/pages.rs`, downloads `drawing.drinfo`); loaded via `tolower --file <path>`. `mountain_drawing.drinfo` at the repo root is a binary sample.
 
+### Renderer (`toupper/src/lib/render/renderer.ts`)
+
+The `Renderer` class is the core rendering engine. It owns the real `<canvas>` element (the one the user sees) and renders everything onto it.
+
+**Two-canvas architecture:** The real canvas is sized to viewport dimensions (literal screen pixels). All drawing content is first rendered onto `OffscreenCanvas` elements sized to the drawing's logical dimensions (`drawing.width × drawing.height`), then painted onto the real canvas at the camera's offset and zoom ratio. The background checkerboard pattern (`squaresCanvas`) is an `OffscreenCanvas` rendered once and reused.
+
+**Per-layer, per-history-index caching:** Each layer's history state at each instruction index is cached as an `OffscreenCanvas` in `layerHistoryCanvases` (a `Map<layerName, Map<historyIndex, {canvas, renderID}>>`). When the renderer needs state at index N, it finds the closest cached index ≤ N (`findClosestContext`), then replays instructions one-by-one from there (`replayInstructions`), creating new offscreen canvases at each step. Snapshots (full-layer data URLs saved every 20 instructions) are used to skip large ranges when available.
+
+**Scratch canvases for in-progress strokes:** Each layer's final output is a "scratch" canvas (`scratchCanvases`, one per layer) that composites the current history canvas + any in-progress strokes. The scratch is invalidated/rebuilt when its size changes, the source history `renderID` changes, or in-progress stroke data regresses (point count decreases, meaning a stroke was restarted). Rebuilding copies the history canvas then applies in-progress instructions on top.
+
+**In-progress stroke optimization:** Stroke instructions (`"points" in instruction`) are drawn incrementally via `resumeStroke`, which tracks per-stroke state (`strokeResumeStates`: per-layer, per-uuid maps of `{pointCount, segmentIndex, …}`). Only new points since the last render are drawn — the full stroke is not redrawn from scratch each frame. Non-stroke in-progress instructions always trigger a scratch rebuild.
+
+**Render guard:** Before doing any work, `render()` checks if anything actually changed since the last frame: missing history indices, layer visibility/order metadata hash, camera zoom/position, viewport dimensions, background toggle, or in-progress instruction data (checked via `inProgressChanged` which compares instruction hashes). If nothing changed, it returns immediately without touching the canvas.
+
+**Invalidation:** `invalidateFrom(layer, index)` drops all cached history canvases from `index` onward for a given layer, plus clears its scratch canvas and stroke resume states. This is called when the drawing model changes (undo, instruction removal, etc.).
+
 ### Frontend specifics (Svelte 5)
 
 - Uses Svelte 5 **runes** throughout (`$state`, `$props`, `$page`, `SvelteMap`/`SvelteSet` from `svelte/reactivity`). Do **not** use Svelte 4 stores or `export let` reactive patterns.
 - Reactive TypeScript modules use the `.svelte.ts` extension (e.g. `drawing.svelte.ts`, `layer.svelte.ts`, `state.svelte.ts`).
-- Global client state is a singleton `gs` in `toupper/src/routes/lobby/[lobby]/state.svelte.ts`.
-- Canvas rendering runs in a Web Worker (`toupper/src/lib/toupper/canvas-worker.ts`, imported via the `?worker` suffix) using `OffscreenCanvas`. Instruction dispatch in `toupper/src/lib/toupper/instruction.ts` is duck-typed (`"points" in instruction`, `"base64" in instruction`, `"point" in instruction && "brush" in instruction`) — not an enum match.
+- Global client state is a singleton `gs` in `toupper/src/lib/state.svelte.ts`.
+- Instruction dispatch in `toupper/src/lib/render/instruction.ts` is duck-typed (`"points" in instruction`, `"selection" in instruction`, `"point" in instruction && "base64" in instruction`, `"point" in instruction && "brush" in instruction`) — not an enum match.
 
 ## Conventions
 
