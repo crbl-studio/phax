@@ -18,6 +18,10 @@ use crate::{
     }
 };
 
+fn to_msg(msg: &WebSocketServerMessage) -> Message {
+    Message::text(serde_json::to_string(msg).unwrap())
+}
+
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Path(username): Path<String>,
@@ -37,10 +41,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
             .users
             .lock()
             .await;
-        let join_msg = Message::text(
-            serde_json::to_string(&WebSocketServerMessage::Join(username.clone()))
-                .unwrap(),
-        );
+        let join_msg = to_msg(&WebSocketServerMessage::Join(username.clone()));
         for user in users.values() {
             user.lock().await.send(join_msg.clone()).await;
         }
@@ -67,10 +68,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .instruct(&data.layer, data.instruction.clone())
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::Instruction(data))
-                                .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::Instruction(data));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -79,13 +77,11 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::Cursor(cursor) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::Cursor(CursorServerData {
+                    let msg = to_msg(&WebSocketServerMessage::Cursor(CursorServerData {
                             cursor,
                             username: username.clone(),
-                        }))
-                        .unwrap(),
-                    );
+                        }));
+
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -100,10 +96,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .set_history_index(&data.layer, data.new_history_index)
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::SetHistoryIndex(data))
-                                .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::SetHistoryIndex(data));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -122,10 +115,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         )
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::MoveInstruction(data))
-                                .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::MoveInstruction(data));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -140,10 +130,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .add_layer(layer_name.clone())
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::AddLayer(layer_name))
-                                .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::AddLayer(layer_name));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -152,10 +139,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::LayerUp(layer_name) => {
                     if app_data.drawing.lock().await.layer_up(&layer_name).is_ok() {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::LayerUp(layer_name))
-                                .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::LayerUp(layer_name));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -170,10 +154,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .layer_down(&layer_name)
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::LayerDown(layer_name))
-                                .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::LayerDown(layer_name));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -188,12 +169,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .set_visibility(&data.layer, data.visible)
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::SetLayerVisibility(
-                                data,
-                            ))
-                            .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::SetLayerVisibility(data));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -206,28 +182,23 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                     sender
                         .lock()
                         .await
-                        .send(Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::Init(InitData {
+                        .send(to_msg(&WebSocketServerMessage::Init(InitData {
                                 drawing: app_data.drawing.lock().await.clone(),
                                 users: app_data.users.lock().await.keys().cloned().collect(),
                                 should_snapshot,
-                            }))
-                            .unwrap(),
-                        ))
+                            })))
                         .await;
                 }
                 WebSocketClientMessage::TempDraw(data) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::TempDraw(TempDrawServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempDraw(TempDrawServerData {
                             brush: data.brush,
                             uuid: data.uuid,
                             start: data.start,
                             end: data.end,
                             layer: data.layer,
                             username: username.clone(),
-                        })).unwrap(),
-                    );
+                        }));
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -236,16 +207,13 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::Selection(selection) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::Selection(
+                    let msg = to_msg(&WebSocketServerMessage::Selection(
                             SelectionServerData {
                                 username: username.clone(),
                                 points: selection.points,
                                 closed: selection.closed,
                             },
-                        ))
-                        .unwrap(),
-                    );
+                        ));
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -254,10 +222,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::Unselect => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::Unselect(username.clone()))
-                            .unwrap(),
-                    );
+                    let msg = to_msg(&WebSocketServerMessage::Unselect(username.clone()));
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -266,8 +231,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::TempImage(data) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::TempImage(TempImageServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempImage(TempImageServerData {
                             username: username.clone(),
                             uuid: data.uuid,
                             layer: data.layer,
@@ -275,9 +239,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                             scale: data.scale,
                             rotate: data.rotate,
 
-                        }))
-                        .unwrap(),
-                    );
+                        }));
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -286,15 +248,12 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::TempImageStart(data) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::TempImageStart(TempImageStartServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempImageStart(TempImageStartServerData {
                             username: username.clone(),
                             uuid: data.uuid,
                             layer: data.layer,
                             image_insertion: data.image_insertion,
-                        }))
-                        .unwrap(),
-                    );
+                        }));
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -303,8 +262,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::TempMoveStart(data) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::TempMoveStart(MoveStartServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempMoveStart(MoveStartServerData {
                             username: username.clone(),
                             uuid: data.uuid,
                             layer: data.layer,
@@ -312,9 +270,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                             end: data.end,
                             scale: data.scale,
                             rotate: data.rotate,
-                        }))
-                        .unwrap(),
-                    );
+                        }));
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -323,17 +279,14 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::TempMove(data) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::TempMove(MoveServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempMove(MoveServerData {
                             username: username.clone(),
                             uuid: data.uuid,
                             layer: data.layer,
                             end: data.end,
                             scale: data.scale,
                             rotate: data.rotate,
-                        }))
-                        .unwrap(),
-                    );
+                        }));
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -348,9 +301,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .snapshot(&data.layer, data.index, data.data.clone())
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::Snapshot(data)).unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::Snapshot(data));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -365,12 +316,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .set_instruction_visibility(&data.layer, data.index, data.visible)
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(
-                                &WebSocketServerMessage::SetInstructionVisibility(data),
-                            )
-                            .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::SetInstructionVisibility(data));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -385,10 +331,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         .remove_instruction(&data.layer, data.index)
                         .is_ok()
                     {
-                        let msg = Message::text(
-                            serde_json::to_string(&WebSocketServerMessage::RemoveInstruction(data))
-                                .unwrap(),
-                        );
+                        let msg = to_msg(&WebSocketServerMessage::RemoveInstruction(data));
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -412,10 +355,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
 
         users.remove(&username);
 
-        let leave_msg = Message::text(
-            serde_json::to_string(&WebSocketServerMessage::Leave(username.clone()))
-                .unwrap(),
-        );
+        let leave_msg = to_msg(&WebSocketServerMessage::Leave(username.clone()));
         for user in users.values() {
             user.lock().await.send(leave_msg.clone()).await;
         }
@@ -426,12 +366,9 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
             *snapshotter = new_snapshotter.clone();
             if let Some(new_name) = new_snapshotter {
                 if let Some(new_sender) = users.get(&new_name) {
-                    let assign_msg = Message::text(
-                        serde_json::to_string(&WebSocketServerMessage::AssignSnapshotter(
+                    let assign_msg = to_msg(&WebSocketServerMessage::AssignSnapshotter(
                             new_name,
-                        ))
-                        .unwrap(),
-                    );
+                        ));
                     drop(snapshotter);
                     new_sender.lock().await.send(assign_msg).await;
                 }
