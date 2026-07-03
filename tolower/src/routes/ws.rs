@@ -7,15 +7,12 @@ use axum::{
     },
     response::IntoResponse,
 };
-use drawing::Drawing;
 use futures::{SinkExt as _, StreamExt as _};
 use log::*;
 use tokio::{sync::Mutex, time::timeout};
 
 use crate::{
-    AppData, ws::messages::{
-        CursorServerData, InitData, MoveServerData, MoveStartServerData, SelectionServerData, TempDrawServerData, TempImageServerData, TempImageStartServerData, WebSocketClientMessage, WebSocketServerMessage
-    }
+    AppData, ws::messages::{WebSocketClientMessage, WebSocketServerMessage}
 };
 
 fn to_msg(msg: &WebSocketServerMessage) -> Message {
@@ -60,15 +57,15 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
         debug!("Incomming websocket message from {username}: {text}");
         if let Ok(m) = serde_json::from_str::<WebSocketClientMessage>(text) {
             match m {
-                WebSocketClientMessage::Instruction(data) => {
+                WebSocketClientMessage::Instruction { layer, instruction } => {
                     if app_data
                         .drawing
                         .lock()
                         .await
-                        .instruct(&data.layer, data.instruction.clone())
+                        .instruct(&layer, instruction.clone())
                         .is_ok()
                     {
-                        let msg = to_msg(&WebSocketServerMessage::Instruction(data));
+                        let msg = to_msg(&WebSocketServerMessage::Instruction { layer, instruction });
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -77,10 +74,10 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                 }
                 WebSocketClientMessage::Cursor(cursor) => {
                     let mut users = app_data.users.lock().await;
-                    let msg = to_msg(&WebSocketServerMessage::Cursor(CursorServerData {
+                    let msg = to_msg(&WebSocketServerMessage::Cursor {
                             cursor,
                             username: username.clone(),
-                        }));
+                        });
 
                     for (name, user) in users.iter_mut() {
                         if name != &username {
@@ -88,34 +85,34 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         }
                     }
                 }
-                WebSocketClientMessage::SetHistoryIndex(data) => {
+                WebSocketClientMessage::SetHistoryIndex { layer, new_history_index } => {
                     if app_data
                         .drawing
                         .lock()
                         .await
-                        .set_history_index(&data.layer, data.new_history_index)
+                        .set_history_index(&layer, new_history_index)
                         .is_ok()
                     {
-                        let msg = to_msg(&WebSocketServerMessage::SetHistoryIndex(data));
+                        let msg = to_msg(&WebSocketServerMessage::SetHistoryIndex { layer, new_history_index });
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::MoveInstruction(data) => {
+                WebSocketClientMessage::MoveInstruction { layer, old_instruction_index, new_instruction_index } => {
                     if app_data
                         .drawing
                         .lock()
                         .await
                         .move_instruction(
-                            &data.layer,
-                            data.old_instruction_index,
-                            data.new_instruction_index,
+                            &layer,
+                            old_instruction_index,
+                            new_instruction_index,
                         )
                         .is_ok()
                     {
-                        let msg = to_msg(&WebSocketServerMessage::MoveInstruction(data));
+                        let msg = to_msg(&WebSocketServerMessage::MoveInstruction { layer, old_instruction_index, new_instruction_index });
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -161,15 +158,15 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         }
                     }
                 }
-                WebSocketClientMessage::SetLayerVisibility(data) => {
+                WebSocketClientMessage::SetLayerVisibility { layer, visible } => {
                     if app_data
                         .drawing
                         .lock()
                         .await
-                        .set_visibility(&data.layer, data.visible)
+                        .set_visibility(&layer, visible)
                         .is_ok()
                     {
-                        let msg = to_msg(&WebSocketServerMessage::SetLayerVisibility(data));
+                        let msg = to_msg(&WebSocketServerMessage::SetLayerVisibility { layer, visible });
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
@@ -182,38 +179,36 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                     sender
                         .lock()
                         .await
-                        .send(to_msg(&WebSocketServerMessage::Init(InitData {
+                        .send(to_msg(&WebSocketServerMessage::Init {
                                 drawing: app_data.drawing.lock().await.clone(),
                                 users: app_data.users.lock().await.keys().cloned().collect(),
                                 should_snapshot,
-                            })))
+                            }))
                         .await;
                 }
-                WebSocketClientMessage::TempDraw(data) => {
+                WebSocketClientMessage::TempDraw { brush, uuid, start, end, layer } => {
                     let mut users = app_data.users.lock().await;
-                    let msg = to_msg(&WebSocketServerMessage::TempDraw(TempDrawServerData {
-                            brush: data.brush,
-                            uuid: data.uuid,
-                            start: data.start,
-                            end: data.end,
-                            layer: data.layer,
+                    let msg = to_msg(&WebSocketServerMessage::TempDraw {
+                            brush,
+                            uuid,
+                            start,
+                            end,
+                            layer,
                             username: username.clone(),
-                        }));
+                        });
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::Selection(selection) => {
+                WebSocketClientMessage::Selection { points, closed } => {
                     let mut users = app_data.users.lock().await;
-                    let msg = to_msg(&WebSocketServerMessage::Selection(
-                            SelectionServerData {
-                                username: username.clone(),
-                                points: selection.points,
-                                closed: selection.closed,
-                            },
-                        ));
+                    let msg = to_msg(&WebSocketServerMessage::Selection {
+                            username: username.clone(),
+                            points,
+                            closed,
+                        });
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
@@ -229,109 +224,108 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                         }
                     }
                 }
-                WebSocketClientMessage::TempImage(data) => {
+                WebSocketClientMessage::TempImage { uuid, layer, point, scale, rotate } => {
                     let mut users = app_data.users.lock().await;
-                    let msg = to_msg(&WebSocketServerMessage::TempImage(TempImageServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempImage {
                             username: username.clone(),
-                            uuid: data.uuid,
-                            layer: data.layer,
-                            point: data.point,
-                            scale: data.scale,
-                            rotate: data.rotate,
-
-                        }));
+                            uuid,
+                            layer,
+                            point,
+                            scale,
+                            rotate,
+                        });
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::TempImageStart(data) => {
+                WebSocketClientMessage::TempImageStart { uuid, layer, image_insertion } => {
                     let mut users = app_data.users.lock().await;
-                    let msg = to_msg(&WebSocketServerMessage::TempImageStart(TempImageStartServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempImageStart {
                             username: username.clone(),
-                            uuid: data.uuid,
-                            layer: data.layer,
-                            image_insertion: data.image_insertion,
-                        }));
+                            uuid,
+                            layer,
+                            image_insertion,
+                        });
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::TempMoveStart(data) => {
+                WebSocketClientMessage::TempMoveStart { uuid, layer, selection, end, scale, rotate } => {
                     let mut users = app_data.users.lock().await;
-                    let msg = to_msg(&WebSocketServerMessage::TempMoveStart(MoveStartServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempMoveStart {
                             username: username.clone(),
-                            uuid: data.uuid,
-                            layer: data.layer,
-                            selection: data.selection,
-                            end: data.end,
-                            scale: data.scale,
-                            rotate: data.rotate,
-                        }));
+                            uuid,
+                            layer,
+                            selection,
+                            end,
+                            scale,
+                            rotate,
+                        });
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::TempMove(data) => {
+                WebSocketClientMessage::TempMove { uuid, layer, end, scale, rotate } => {
                     let mut users = app_data.users.lock().await;
-                    let msg = to_msg(&WebSocketServerMessage::TempMove(MoveServerData {
+                    let msg = to_msg(&WebSocketServerMessage::TempMove {
                             username: username.clone(),
-                            uuid: data.uuid,
-                            layer: data.layer,
-                            end: data.end,
-                            scale: data.scale,
-                            rotate: data.rotate,
-                        }));
+                            uuid,
+                            layer,
+                            end,
+                            scale,
+                            rotate,
+                        });
                     for (name, user) in users.iter_mut() {
                         if name != &username {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::Snapshot(data) => {
+                WebSocketClientMessage::Snapshot { layer, data, index } => {
                     if app_data
                         .drawing
                         .lock()
                         .await
-                        .snapshot(&data.layer, data.index, data.data.clone())
+                        .snapshot(&layer, index, data.clone())
                         .is_ok()
                     {
-                        let msg = to_msg(&WebSocketServerMessage::Snapshot(data));
+                        let msg = to_msg(&WebSocketServerMessage::Snapshot { layer, data, index });
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::SetInstructionVisibility(data) => {
+                WebSocketClientMessage::SetInstructionVisibility { layer, index, visible } => {
                     if app_data
                         .drawing
                         .lock()
                         .await
-                        .set_instruction_visibility(&data.layer, data.index, data.visible)
+                        .set_instruction_visibility(&layer, index, visible)
                         .is_ok()
                     {
-                        let msg = to_msg(&WebSocketServerMessage::SetInstructionVisibility(data));
+                        let msg = to_msg(&WebSocketServerMessage::SetInstructionVisibility { layer, index, visible });
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
                         }
                     }
                 }
-                WebSocketClientMessage::RemoveInstruction(data) => {
+                WebSocketClientMessage::RemoveInstruction { layer, index } => {
                     if app_data
                         .drawing
                         .lock()
                         .await
-                        .remove_instruction(&data.layer, data.index)
+                        .remove_instruction(&layer, index)
                         .is_ok()
                     {
-                        let msg = to_msg(&WebSocketServerMessage::RemoveInstruction(data));
+                        let msg = to_msg(&WebSocketServerMessage::RemoveInstruction { layer, index });
                         let mut users = app_data.users.lock().await;
                         for user in users.values_mut() {
                             user.lock().await.send(msg.clone()).await;
