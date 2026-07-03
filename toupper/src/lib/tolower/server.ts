@@ -32,6 +32,7 @@ import type {
   TempMoveStartServerMessage,
   TempMoveStartClientMessage,
   TempDrawClientMessage,
+  AssignSnapshotterMessage,
 } from "./server-types";
 import * as TypeConverter from "./type-converter";
 
@@ -59,6 +60,7 @@ interface EventMap {
   tempimage: CustomEvent<TempImageServerMessage["TempImage"]>;
   tempmovestart: CustomEvent<TempMoveStartServerMessage["TempMoveStart"]>;
   tempmove: CustomEvent<TempMoveServerMessage["TempMove"]>;
+  assignsnapshotter: CustomEvent<AssignSnapshotterMessage["AssignSnapshotter"]>;
 }
 
 interface ServerEventTarget extends EventTarget {

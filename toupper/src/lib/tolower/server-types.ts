@@ -96,6 +96,7 @@ export type InitMessage = {
   Init: {
     drawing: Drawing;
     users: string[];
+    should_snapshot: boolean;
   };
 };
 
@@ -325,6 +326,10 @@ export type LeaveMessage = {
   Leave: string;
 };
 
+export type AssignSnapshotterMessage = {
+  AssignSnapshotter: string;
+};
+
 export type WebSocketClientMessage =
   | CursorClientMessage
   | InstructionMessage
@@ -367,4 +372,5 @@ export type WebSocketServerMessage =
   | TempMoveServerMessage
   | SnapshotMessage
   | SetInstructionVisibilityMessage
-  | RemoveInstructionMessage;
+  | RemoveInstructionMessage
+  | AssignSnapshotterMessage;

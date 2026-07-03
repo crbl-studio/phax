@@ -183,6 +183,10 @@ export class Renderer {
     return this.layerHistoryCanvases.get(layer)?.get(historyIndex);
   }
 
+  setSnapshotCallback(cb: SnapshotCallback): void {
+    this.onSnapshot = cb;
+  }
+
   invalidateFrom(layer: string, index: number): void {
     const layerHistory = this.layerHistoryCanvases.get(layer);
     if (!layerHistory) return;

@@ -45,6 +45,11 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
             user.lock().await.send(join_msg.clone()).await;
         }
         users.insert(username.clone(), sender.clone());
+
+        let mut snapshotter = app_data.snapshotter.lock().await;
+        if snapshotter.is_none() {
+            *snapshotter = Some(username.clone());
+        }
     }
 
     while let Ok(Some(Ok(msg))) = timeout(Duration::from_secs(3), receiver.next()).await {
@@ -196,6 +201,8 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                     }
                 }
                 WebSocketClientMessage::RequestInit => {
+                    let should_snapshot =
+                        app_data.snapshotter.lock().await.as_ref() == Some(&username);
                     sender
                         .lock()
                         .await
@@ -203,6 +210,7 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
                             serde_json::to_string(&WebSocketServerMessage::Init(InitData {
                                 drawing: app_data.drawing.lock().await.clone(),
                                 users: app_data.users.lock().await.keys().cloned().collect(),
+                                should_snapshot,
                             }))
                             .unwrap(),
                         ))
@@ -405,11 +413,29 @@ pub async fn handle_socket(socket: WebSocket, username: String, app_data: Arc<Ap
         users.remove(&username);
 
         let leave_msg = Message::text(
-            serde_json::to_string(&WebSocketServerMessage::Leave(username))
+            serde_json::to_string(&WebSocketServerMessage::Leave(username.clone()))
                 .unwrap(),
         );
         for user in users.values() {
             user.lock().await.send(leave_msg.clone()).await;
+        }
+
+        let mut snapshotter = app_data.snapshotter.lock().await;
+        if snapshotter.as_ref() == Some(&username) {
+            let new_snapshotter = users.keys().next().cloned();
+            *snapshotter = new_snapshotter.clone();
+            if let Some(new_name) = new_snapshotter {
+                if let Some(new_sender) = users.get(&new_name) {
+                    let assign_msg = Message::text(
+                        serde_json::to_string(&WebSocketServerMessage::AssignSnapshotter(
+                            new_name,
+                        ))
+                        .unwrap(),
+                    );
+                    drop(snapshotter);
+                    new_sender.lock().await.send(assign_msg).await;
+                }
+            }
         }
     }
 }

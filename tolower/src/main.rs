@@ -19,6 +19,7 @@ mod ws;
 pub struct AppData {
     pub drawing: Mutex<Drawing>,
     pub users: Mutex<HashMap<String, Arc<Mutex<SplitSink<WebSocket, axum::extract::ws::Message>>>>>,
+    pub snapshotter: Mutex<Option<String>>,
 }
 
 #[tokio::main]
@@ -36,6 +37,7 @@ async fn main() -> std::io::Result<()> {
     let app_data = Arc::new(AppData {
         drawing,
         users: Default::default(),
+        snapshotter: Default::default(),
     });
     info!("Starting server on port {port}");
     let app = Router::new()

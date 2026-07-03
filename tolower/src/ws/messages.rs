@@ -51,6 +51,7 @@ pub enum WebSocketServerMessage {
     Snapshot(SnapshotData),
     SetInstructionVisibility(SetInstructionVisibilityData),
     RemoveInstruction(RemoveInstructionData),
+    AssignSnapshotter(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -107,6 +108,7 @@ pub struct CursorServerData {
 pub struct InitData {
     pub drawing: drawing::Drawing,
     pub users: Vec<String>,
+    pub should_snapshot: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

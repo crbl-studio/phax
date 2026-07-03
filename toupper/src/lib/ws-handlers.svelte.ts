@@ -8,9 +8,16 @@ import { SvelteMap } from "svelte/reactivity";
 export function registerWsHandlers(server: Server, username: string): void {
   server.registerEventHandler("init", (data) => {
     gs.drawing = FromServer.drawing(data.drawing);
-    gs.renderer = new Renderer(gs.canvas!, gs.drawing, gs.inProgress, (layer, data, index) => {
-      gs.server?.snapshot(layer, data, index);
-    });
+    gs.renderer = new Renderer(
+      gs.canvas!,
+      gs.drawing,
+      gs.inProgress,
+      data.should_snapshot
+        ? (layer, data, index) => {
+            gs.server?.snapshot(layer, data, index);
+          }
+        : undefined,
+    );
     data.users.forEach((u) => {
       if (u !== username) gs.cursors.set(u, null);
     });
@@ -55,6 +62,12 @@ export function registerWsHandlers(server: Server, username: string): void {
 
   server.registerEventHandler("snapshot", ({ layer, data, index }) => {
     gs.drawing.snapshot(layer, data, index);
+  });
+
+  server.registerEventHandler("assignsnapshotter", () => {
+    gs.renderer?.setSnapshotCallback((layer, data, index) => {
+      gs.server?.snapshot(layer, data, index);
+    });
   });
 
   server.registerEventHandler("setinstructionvisibility", ({ layer, index, visible }) => {
