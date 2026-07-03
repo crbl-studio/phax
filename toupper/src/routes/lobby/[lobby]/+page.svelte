@@ -12,9 +12,8 @@
   import Canvas from "./Canvas.svelte";
   import CursorLayer from "./CursorLayer.svelte";
   import PreviewLayer from "./PreviewLayer.svelte";
-  import BgCanvas from "./BgCanvas.svelte";
-  import { getRatio } from "$lib/util";
   import { v4 as uuid } from "uuid";
+  import { setupKeyboardShortcuts } from "$lib/keyboard-shortcuts";
 
   let username = page.params.lobby ?? uuid();
 
@@ -35,29 +34,13 @@
 
     registerWsHandlers(gs.server, username);
 
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "x") {
-        const temp = gs.secondaryBrush;
-        gs.secondaryBrush = gs.brush;
-        gs.brush = temp;
-      }
-    });
+    setupKeyboardShortcuts();
   });
 
   $effect(() => {
     if (gs.selectedLayer === null && gs.drawing.layerOrder.length > 0) {
       gs.selectedLayer = gs.drawing.layerOrder[0];
     }
-  });
-
-  let realHeight = $state(0);
-  let realWidth = $state(0);
-
-  $effect(() => {
-    gs.ratio = getRatio(
-      { width: realWidth - 2, height: realHeight - 2 },
-      { width: gs.drawing.width, height: gs.drawing.height },
-    );
   });
 
   onDestroy(() => {
@@ -105,15 +88,12 @@
       {/if}
     {/if}
   </div>
-  <div class="layers" bind:clientWidth={realWidth} bind:clientHeight={realHeight}>
-    <BgCanvas />
+  <div class="layers">
     {#if gs.hoveredInstruction}
       <PreviewLayer />
     {/if}
-    <div style="visibility: {!gs.hoveredInstruction ? 'visible' : 'hidden'};">
-      <Canvas />
-      <CursorLayer />
-    </div>
+    <Canvas />
+    <CursorLayer />
   </div>
   <div class="info">
     <div class="coordinates">
@@ -150,11 +130,17 @@
     position: relative;
     width: 100%;
     height: 100%;
+    background-color: #3b4252;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
   }
   .layers :global {
     canvas {
       max-width: 100%;
       max-height: 100%;
+      grid-row: 1 / 2;
+      grid-column: 1 / 2;
     }
   }
   .buttons {

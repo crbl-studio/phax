@@ -1,22 +1,14 @@
 import type { Point } from "./drinfo";
-import type { Dimensions } from "./types";
+import type { CameraState } from "./state.svelte";
 
-export const getRatio = (canvas: Dimensions, drawing: Dimensions) => {
-  let ratio = drawing.height / canvas.height;
-  if (drawing.width / ratio > canvas.width) {
-    ratio = drawing.width / canvas.width;
-  }
-  return ratio;
+export const getRealX = (element: HTMLElement, e: MouseEvent) => {
+  const rect = element.getBoundingClientRect();
+  return (e.clientX - rect.left) * window.devicePixelRatio;
 };
 
-export const getX = (element: HTMLElement, e: MouseEvent, ratio: number) => {
+export const getRealY = (element: HTMLElement, e: MouseEvent) => {
   const rect = element.getBoundingClientRect();
-  return (e.clientX - rect.left) * ratio;
-};
-
-export const getY = (element: HTMLElement, e: MouseEvent, ratio: number) => {
-  const rect = element.getBoundingClientRect();
-  return (e.clientY - rect.top) * ratio;
+  return (e.clientY - rect.top) * window.devicePixelRatio;
 };
 
 export const rgbToStr = (r: number, g: number, b: number): `#${string}` => {
@@ -66,4 +58,25 @@ export const translateSelection = (
       y: rx * sin + ry * cos + cy + dy,
     };
   });
+};
+
+export const translatePointR2C = (point: Point, camera: CameraState) => {
+  return {
+    x: ((point.x - camera.position.x) / camera.zoom) * 100,
+    y: ((point.y - camera.position.y) / camera.zoom) * 100,
+  };
+};
+
+export const translatePointC2R = (point: Point, camera: CameraState) => {
+  return {
+    x: (point.x * camera.zoom) / 100 + camera.position.x,
+    y: (point.y * camera.zoom) / 100 + camera.position.y,
+  };
+};
+
+export const floorPoint = (point: Point) => {
+  return {
+    x: Math.floor(point.x),
+    y: Math.floor(point.y),
+  };
 };

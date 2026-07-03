@@ -1,8 +1,9 @@
 import type { Drawing, InstructionBox } from "$lib/drinfo";
-import type { InProgressEntry } from "$lib/state.svelte";
+import type { CameraState, InProgressEntry } from "$lib/state.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import { applyInstruction, resumeStroke, type StrokeResumeState } from "./instruction";
 import { v4 as uuid } from "uuid";
+import { drawSquares } from "./draw";
 
 export type SnapshotCallback = (layer: string, data: string, index: number) => void;
 
@@ -32,6 +33,12 @@ export class Renderer {
   private inProgressHashes = new Map<string, Map<string, string>>();
   private onSnapshot?: SnapshotCallback;
   private lastRenderMetadataHash: string = "";
+  private previousCameraState: CameraState | null = null;
+  private previousViewportHeight: number = 0;
+  private previousViewportWidth: number = 0;
+  private previousBg: boolean = true;
+  private squaresCanvas: OffscreenCanvas;
+  private squaresInitialized = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -44,9 +51,16 @@ export class Renderer {
     this.drawing = drawing;
     this.inProgress = inProgress;
     this.onSnapshot = onSnapshot;
+    this.squaresCanvas = new OffscreenCanvas(drawing.width, drawing.height);
   }
 
-  async render(): Promise<void> {
+  async render(
+    camera: CameraState,
+    bg: boolean,
+    viewportHeight: number,
+    viewportWidth: number,
+  ): Promise<void> {
+    const ratio = camera.zoom / 100;
     let updates = false;
     for (const [layerName, layer] of this.drawing.layers) {
       if (!layer.visible) continue;
@@ -55,20 +69,47 @@ export class Renderer {
         break;
       }
     }
-    if (!updates) {
-      updates = this.inProgressChanged();
-    }
     const drawingMetadataHash = this.getDrawingMetadataHash();
-    if (this.lastRenderMetadataHash != drawingMetadataHash) {
+    if (this.lastRenderMetadataHash != drawingMetadataHash) updates = true;
+    if (
+      !this.previousCameraState ||
+      this.previousCameraState.zoom !== camera.zoom ||
+      this.previousCameraState.position.x !== camera.position.x ||
+      this.previousCameraState.position.y !== camera.position.y
+    )
       updates = true;
-    }
+    if (this.previousViewportHeight !== viewportHeight) updates = true;
+    if (this.previousViewportWidth !== viewportWidth) updates = true;
+    if (this.previousBg !== bg) updates = true;
+    if (!updates) updates = this.inProgressChanged();
     if (!updates) return;
-    const w = this.drawing.width;
-    const h = this.drawing.height;
-    if (this.canvas.width !== w) this.canvas.width = w;
-    if (this.canvas.height !== h) this.canvas.height = h;
+    console.log("rendering");
 
-    this.ctx.clearRect(0, 0, w, h);
+    this.previousCameraState = {
+      panning: false,
+      position: { ...camera.position },
+      zoom: camera.zoom,
+    };
+    this.previousViewportHeight = viewportHeight;
+    this.previousViewportWidth = viewportWidth;
+    this.previousBg = bg;
+
+    if (!this.squaresInitialized) {
+      drawSquares(this.squaresCanvas.getContext("2d")!);
+      this.squaresInitialized = true;
+    }
+
+    this.ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+    if (bg) {
+      this.ctx.drawImage(
+        this.squaresCanvas,
+        camera.position.x,
+        camera.position.y,
+        this.drawing.width * ratio,
+        this.drawing.height * ratio,
+      );
+    }
 
     for (const layerName of this.drawing.layerOrder) {
       const layer = this.drawing.layers.get(layerName);
@@ -85,8 +126,8 @@ export class Renderer {
         historyCanvas,
         historyRenderID,
         inProgress,
-        w,
-        h,
+        this.drawing.width,
+        this.drawing.height,
       );
       const scratchCtx = scratch.getContext("2d")!;
 
@@ -126,7 +167,13 @@ export class Renderer {
         this.strokeResumeStates.set(layerName, states);
       }
 
-      this.ctx.drawImage(scratch, 0, 0);
+      this.ctx.drawImage(
+        scratch,
+        camera.position.x,
+        camera.position.y,
+        this.drawing.width * ratio,
+        this.drawing.height * ratio,
+      );
     }
 
     this.lastRenderMetadataHash = drawingMetadataHash;

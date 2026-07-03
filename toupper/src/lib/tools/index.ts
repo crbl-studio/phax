@@ -1,7 +1,7 @@
 import type { Point } from "$lib/drinfo";
 import { gs } from "$lib/state.svelte";
 import type { ToolType } from "../types";
-import { getX, getY } from "../util";
+import { getRealX, getRealY, translatePointR2C } from "../util";
 
 export abstract class Tool {
   public abstract onmousemove(event: MouseEvent, element: HTMLElement): void;
@@ -29,18 +29,18 @@ export abstract class BaseTool extends Tool {
     this.mousedown = null;
   }
   public onmousedown(event: MouseEvent, element: HTMLElement): void {
-    const x = getX(element, event, gs.ratio);
-    const y = getY(element, event, gs.ratio);
-    this.mousedown = { x, y };
+    const x = getRealX(element, event);
+    const y = getRealY(element, event);
+    this.mousedown = translatePointR2C({ x, y }, gs.camera);
   }
   public onmouseleave(event: MouseEvent, element: HTMLElement): void {
     this.onmouseup(event, element);
   }
   public onmousemove(event: MouseEvent, element: HTMLElement): void {
-    const x = getX(element, event, gs.ratio);
-    const y = getY(element, event, gs.ratio);
+    const x = getRealX(element, event);
+    const y = getRealY(element, event);
     this.previousCursorPosition = this.cursorPosition;
-    this.cursorPosition = { x, y };
+    this.cursorPosition = translatePointR2C({ x, y }, gs.camera);
     if (!this.previousCursorPosition) this.previousCursorPosition = this.cursorPosition;
   }
   public onmouseenter(_event: MouseEvent, _element: HTMLElement): void {}

@@ -1,8 +1,17 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { gs } from "$lib/state.svelte";
 
   let canvas: HTMLCanvasElement;
+
+  let height = $state(1);
+  let width = $state(1);
+
+  $effect(() => {
+    if (canvas && width > 0 && height > 0) {
+      canvas.width = width * window.devicePixelRatio;
+      canvas.height = height * window.devicePixelRatio;
+    }
+  });
 
   $effect(() => {
     gs.canvas = canvas;
@@ -13,9 +22,16 @@
     let cancelled = false;
     function loop() {
       if (gs.renderer) {
-        gs.renderer.render().then(() => {
-          if (!cancelled) req = requestAnimationFrame(loop);
-        });
+        gs.renderer
+          .render(
+            gs.camera,
+            gs.bg,
+            height * window.devicePixelRatio,
+            width * window.devicePixelRatio,
+          )
+          .then(() => {
+            if (!cancelled) req = requestAnimationFrame(loop);
+          });
       } else {
         if (!cancelled) req = requestAnimationFrame(loop);
       }
@@ -26,37 +42,13 @@
       cancelAnimationFrame(req);
     };
   });
-
-  const onkeydown = (e: KeyboardEvent) => {
-    if (!gs.selectedLayer) return;
-    const layer = gs.drawing.layers.get(gs.selectedLayer);
-    if (!layer) return;
-    // Ctrl Y (or Ctrl Shift Z) handler
-    if (
-      ((e.key === "Z" && e.ctrlKey && e.shiftKey) || (e.key === "y" && e.ctrlKey)) &&
-      layer.historyIndex < layer.history.length
-    ) {
-      gs.server?.setHistoryIndex(gs.selectedLayer, layer.historyIndex + 1);
-      console.log(`sent redo for layer ${gs.selectedLayer}`);
-    }
-    // Ctrl Z handler
-    if (e.key === "z" && e.ctrlKey && !e.shiftKey && layer.historyIndex > 0) {
-      gs.server?.setHistoryIndex(gs.selectedLayer, layer.historyIndex - 1);
-      console.log(`sent undo for layer ${gs.selectedLayer}`);
-    }
-  };
-
-  onMount(() => {
-    window.addEventListener("keydown", onkeydown);
-
-    return () => window.removeEventListener("keydown", onkeydown);
-  });
 </script>
 
-<canvas bind:this={canvas} height={gs.drawing.height} width={gs.drawing.width}></canvas>
+<canvas bind:this={canvas} bind:clientHeight={height} bind:clientWidth={width}></canvas>
 
 <style>
   canvas {
-    position: absolute;
+    height: 100%;
+    width: 100%;
   }
 </style>

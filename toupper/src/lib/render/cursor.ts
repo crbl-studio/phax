@@ -1,36 +1,37 @@
 import type { Brush, Point } from "$lib/drinfo";
+import type { CameraState } from "$lib/state.svelte";
 import { type Cursor, ToolType } from "$lib/types";
+import { translatePointC2R } from "$lib/util";
 
 const renderSelectionCursor = (
   cursorContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  ratio: number,
   point: Point,
   username: string | null,
 ) => {
-  cursorContext.lineWidth = 4 * ratio;
+  cursorContext.lineWidth = 4;
   cursorContext.strokeStyle = "#ffffff";
 
   cursorContext.beginPath();
-  cursorContext.moveTo(point.x - 11 * ratio, point.y);
-  cursorContext.lineTo(point.x + 11 * ratio, point.y);
+  cursorContext.moveTo(point.x - 11, point.y);
+  cursorContext.lineTo(point.x + 11, point.y);
   cursorContext.stroke();
 
   cursorContext.beginPath();
-  cursorContext.moveTo(point.x, point.y - 11 * ratio);
-  cursorContext.lineTo(point.x, point.y + 11 * ratio);
+  cursorContext.moveTo(point.x, point.y - 11);
+  cursorContext.lineTo(point.x, point.y + 11);
   cursorContext.stroke();
 
-  cursorContext.lineWidth = 2 * ratio;
+  cursorContext.lineWidth = 2;
   cursorContext.strokeStyle = "#000000";
 
   cursorContext.beginPath();
-  cursorContext.moveTo(point.x - 10 * ratio, point.y);
-  cursorContext.lineTo(point.x + 10 * ratio, point.y);
+  cursorContext.moveTo(point.x - 10, point.y);
+  cursorContext.lineTo(point.x + 10, point.y);
   cursorContext.stroke();
 
   cursorContext.beginPath();
-  cursorContext.moveTo(point.x, point.y - 10 * ratio);
-  cursorContext.lineTo(point.x, point.y + 10 * ratio);
+  cursorContext.moveTo(point.x, point.y - 10);
+  cursorContext.lineTo(point.x, point.y + 10);
   cursorContext.stroke();
 
   if (username !== null) {
@@ -49,67 +50,68 @@ const renderStrokeCursor = (
     return;
   }
   cursorContext.setLineDash([]);
+  const brushDisplayRadius = (brush.width / 2) * ratio;
   if (brush.width * ratio < 20 && brush.brushShape.shape === "circle") {
-    cursorContext.lineWidth = 4 * ratio;
+    cursorContext.lineWidth = 4;
     cursorContext.strokeStyle = "#ffffff";
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x - 12 * ratio - brush.width / 2, point.y);
-    cursorContext.lineTo(point.x - 3 * ratio - brush.width / 2, point.y);
+    cursorContext.moveTo(point.x - 12 - brushDisplayRadius, point.y);
+    cursorContext.lineTo(point.x - 3 - brushDisplayRadius, point.y);
     cursorContext.stroke();
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x, point.y - 12 * ratio - brush.width / 2);
-    cursorContext.lineTo(point.x, point.y - 3 * ratio - brush.width / 2);
+    cursorContext.moveTo(point.x, point.y - 12 - brushDisplayRadius);
+    cursorContext.lineTo(point.x, point.y - 3 - brushDisplayRadius);
     cursorContext.stroke();
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x + 12 * ratio + brush.width / 2, point.y);
-    cursorContext.lineTo(point.x + 3 * ratio + brush.width / 2, point.y);
+    cursorContext.moveTo(point.x + 12 + brushDisplayRadius, point.y);
+    cursorContext.lineTo(point.x + 3 + brushDisplayRadius, point.y);
     cursorContext.stroke();
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x, point.y + 12 * ratio + brush.width / 2);
-    cursorContext.lineTo(point.x, point.y + 3 * ratio + brush.width / 2);
+    cursorContext.moveTo(point.x, point.y + 12 + brushDisplayRadius);
+    cursorContext.lineTo(point.x, point.y + 3 + brushDisplayRadius);
     cursorContext.stroke();
 
-    cursorContext.lineWidth = 2 * ratio;
+    cursorContext.lineWidth = 2;
     cursorContext.strokeStyle = "#000000";
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x - 11 * ratio - brush.width / 2, point.y);
-    cursorContext.lineTo(point.x - 4 * ratio - brush.width / 2, point.y);
+    cursorContext.moveTo(point.x - 11 - brushDisplayRadius, point.y);
+    cursorContext.lineTo(point.x - 4 - brushDisplayRadius, point.y);
     cursorContext.stroke();
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x, point.y - 11 * ratio - brush.width / 2);
-    cursorContext.lineTo(point.x, point.y - 4 * ratio - brush.width / 2);
+    cursorContext.moveTo(point.x, point.y - 11 - brushDisplayRadius);
+    cursorContext.lineTo(point.x, point.y - 4 - brushDisplayRadius);
     cursorContext.stroke();
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x + 11 * ratio + brush.width / 2, point.y);
-    cursorContext.lineTo(point.x + 4 * ratio + brush.width / 2, point.y);
+    cursorContext.moveTo(point.x + 11 + brushDisplayRadius, point.y);
+    cursorContext.lineTo(point.x + 4 + brushDisplayRadius, point.y);
     cursorContext.stroke();
 
     cursorContext.beginPath();
-    cursorContext.moveTo(point.x, point.y + 11 * ratio + brush.width / 2);
-    cursorContext.lineTo(point.x, point.y + 4 * ratio + brush.width / 2);
+    cursorContext.moveTo(point.x, point.y + 11 + brushDisplayRadius);
+    cursorContext.lineTo(point.x, point.y + 4 + brushDisplayRadius);
     cursorContext.stroke();
   }
   const drawCursor = () => {
     if (brush.brushShape.shape === "circle") {
-      cursorContext.lineWidth = 1 * ratio;
+      cursorContext.lineWidth = 1;
       cursorContext.beginPath();
-      cursorContext.arc(point.x, point.y, brush.width / 2, 0, 2 * Math.PI);
+      cursorContext.arc(point.x, point.y, brushDisplayRadius, 0, 2 * Math.PI);
       cursorContext.stroke();
     } else if (brush.brushShape.shape === "square") {
-      cursorContext.lineWidth = 1 * ratio;
+      cursorContext.lineWidth = 1;
       cursorContext.beginPath();
       cursorContext.strokeRect(
-        point.x - brush.width / 2,
-        point.y - brush.width / 2,
-        brush.width,
-        brush.width,
+        point.x - brushDisplayRadius,
+        point.y - brushDisplayRadius,
+        brushDisplayRadius * 2,
+        brushDisplayRadius * 2,
       );
       cursorContext.stroke();
     }
@@ -122,7 +124,7 @@ const renderStrokeCursor = (
   drawCursor();
   if (username !== null) {
     const offset =
-      brush.brushShape.shape === "square" ? brush.width / 2 + 10 : Math.max(brush.width / 2, 15);
+      brush.brushShape.shape === "square" ? brushDisplayRadius + 10 : Math.max(brush.width / 2, 15);
     renderUsername(cursorContext, { x: point.x + offset, y: point.y + offset }, username);
   }
   cursorContext.setLineDash([]);
@@ -140,14 +142,15 @@ const renderUsername = (
 
 export const renderTool = (
   cursorContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  ratio: number,
+  zoom: number,
   cursor: Cursor | null,
   username: string | null,
 ) => {
+  const ratio = zoom / 100;
   if (cursor?.tool?.type === ToolType.Stroke || cursor?.tool?.type === ToolType.Eraser) {
     renderStrokeCursor(cursorContext, ratio, cursor.point, cursor.tool.brush, username);
   } else if (cursor) {
-    renderSelectionCursor(cursorContext, ratio, cursor.point, username);
+    renderSelectionCursor(cursorContext, cursor.point, username);
   }
 };
 
@@ -155,25 +158,30 @@ export const renderSelection = (
   context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   points: Point[],
   close: boolean,
-  ratio: number,
+  camera: CameraState,
   username: string | null,
 ) => {
+  const transaltedPoints = points.map((p) => translatePointC2R(p, camera));
   context.lineWidth = 1;
+  const draw = () => {
+    if (transaltedPoints.length === 0) return;
+    context.beginPath();
+    context.moveTo(transaltedPoints[0].x, transaltedPoints[0].y);
+    for (let i = 1; i < transaltedPoints.length; i++) {
+      context.lineTo(transaltedPoints[i].x, transaltedPoints[i].y);
+    }
+    if (close) context.closePath();
+    context.stroke();
+  };
   context.strokeStyle = "#000000";
-  context.setLineDash([6 / ratio, 6 / ratio]);
-
-  if (points.length === 0) return;
-  context.beginPath();
-  context.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    context.lineTo(points[i].x, points[i].y);
-  }
-  if (close) context.closePath();
-  context.stroke();
-
+  context.setLineDash([]);
+  draw();
+  context.strokeStyle = "#ffffff";
+  context.setLineDash([6, 6]);
+  draw();
   context.setLineDash([]);
 
   if (username) {
-    renderUsername(context, { x: points[0].x, y: points[0].y - 4 }, username);
+    renderUsername(context, { x: transaltedPoints[0].x, y: transaltedPoints[0].y - 4 }, username);
   }
 };

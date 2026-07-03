@@ -7,6 +7,12 @@ import { SvelteMap } from "svelte/reactivity";
 import type { Renderer } from "./render";
 import { percentageToU32 } from "./util";
 
+export type CameraState = {
+  zoom: number;
+  position: Point;
+  panning: boolean;
+};
+
 export type InProgressEntry = {
   instructionBox: InstructionBox;
   layer: string;
@@ -17,7 +23,7 @@ interface GlobalState {
   cursorPosition: Point | null;
   brush: Brush;
   secondaryBrush: Brush;
-  ratio: number;
+  camera: CameraState;
   server: Server | null;
   selectedLayer: string | null;
   bg: boolean;
@@ -40,7 +46,14 @@ export const gs: GlobalState = $state({
   cursorPosition: null,
   brush: getDefaultBrush(),
   secondaryBrush: getSecondaryDefaultBrush(),
-  ratio: 0,
+  camera: {
+    zoom: 100,
+    position: {
+      x: 0,
+      y: 0,
+    },
+    panning: false,
+  },
   server: null,
   selectedLayer: null,
   bg: true,
