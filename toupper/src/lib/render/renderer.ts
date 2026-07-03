@@ -7,7 +7,8 @@ import { drawSquares } from "./draw";
 
 export type SnapshotCallback = (layer: string, data: string, index: number) => void;
 
-const SNAPSHOT_INTERVAL = 20;
+const SNAPSHOT_INTERVAL = 100;
+const MAX_HISTORY_CANVASES = 10;
 
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
@@ -262,7 +263,10 @@ export class Renderer {
       this.layerHistoryCanvases.set(layerName, contexts);
     }
 
-    if (contexts.has(targetIndex)) return;
+    if (contexts.has(targetIndex)) {
+      this.trimHistoryCanvases(layerName, targetIndex);
+      return;
+    }
 
     const w = this.drawing.width;
     const h = this.drawing.height;
@@ -339,6 +343,26 @@ export class Renderer {
         const data = await this.blobToDataUrl(blob);
         this.onSnapshot(layerName, data, current);
       }
+    }
+
+    this.trimHistoryCanvases(layerName, current);
+  }
+
+  private trimHistoryCanvases(layerName: string, maxIndex: number): void {
+    const contexts = this.layerHistoryCanvases.get(layerName);
+    if (!contexts) return;
+
+    const keepThreshold = maxIndex - MAX_HISTORY_CANVASES + 1;
+    if (keepThreshold <= 1) return;
+
+    const keysToDelete: number[] = [];
+    for (const key of contexts.keys()) {
+      if (key !== 0 && key < keepThreshold) {
+        keysToDelete.push(key);
+      }
+    }
+    for (const key of keysToDelete) {
+      contexts.delete(key);
     }
   }
 
