@@ -10,7 +10,7 @@ export const getDefaultBrush = (): Brush => ({
   },
   opacity: percentageToU32(100),
   erase: false,
-  repeat: percentageToU32(2),
+  repeat: percentageToU32(8),
 });
 
 export const getSecondaryDefaultBrush = (): Brush => ({
