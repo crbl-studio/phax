@@ -1,6 +1,6 @@
 # AGENTS.md
 
-`fax` is a collaborative online drawing platform made of three **independent** projects (no shared workspace config, no build orchestrator — each is built and run from its own directory):
+`phax` is a collaborative online drawing platform made of three **independent** projects (no shared workspace config, no build orchestrator — each is built and run from its own directory):
 
 - `drinfo/` — Rust library implementing the DrInFo drawing format. **Crate name is `drawing`, not `drinfo`** (folder ≠ crate name).
 - `tolower/` — Rust axum WebSocket server (the backend). Depends on `drawing` via `path = "../drinfo"`.

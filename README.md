@@ -1,10 +1,10 @@
-# fax
+# phax
 
-fax is a combination of tools that form a collaborative online drawing platform.
+phax is a combination of tools that form a collaborative online drawing platform.
 
 ![a drawing of a mountain](./mountain_drawing.jpg)
 
-fax is composed of:
+phax is composed of:
 
 - DrInFo: a unique file format and data structure to store drawing information efficiently.
 - tolower: a server that allows multiple clients to work on a shared DrInFo drawing.
@@ -14,7 +14,7 @@ fax is composed of:
 
 ### Current
 
-fax has many features, including:
+phax has many features, including:
 
 - real time collaboration
 - participants live cursor
@@ -29,7 +29,7 @@ fax has many features, including:
 
 ### Planned
 
-fax also has some planned features:
+phax also has some planned features:
 
 - file optimization
 

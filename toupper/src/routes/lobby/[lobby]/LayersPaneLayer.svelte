@@ -1,5 +1,6 @@
 <script lang="ts">
   import { gs } from "$lib/state.svelte";
+  import { drawSquares } from "$lib/render";
   import { untrack } from "svelte";
 
   interface Props {
@@ -21,9 +22,10 @@
     let req: number;
     function loop() {
       if (canvas && original && original.renderID !== untrack(() => currentRenderID)) {
-        const context = canvas.getContext("2d");
-        context?.clearRect(0, 0, canvas.width, canvas.height);
-        context?.drawImage(original.canvas, 0, 0);
+        const context = canvas.getContext("2d")!;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        drawSquares(context, 120);
+        context.drawImage(original.canvas, 0, 0);
         currentRenderID = original.renderID;
       }
       req = requestAnimationFrame(loop);

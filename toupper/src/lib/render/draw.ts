@@ -2,6 +2,7 @@ import type { ImageInsertion } from "$lib/drinfo";
 
 export const drawSquares = (
   context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  size = 20,
 ) => {
   let x = 0;
   let y = 0;
@@ -12,12 +13,12 @@ export const drawSquares = (
     while (x < context.canvas.width) {
       context.fillStyle = white ? "#ffffff" : "#aaaaaa";
       white = !white;
-      context.fillRect(x, y, 20, 20);
-      x += 20;
+      context.fillRect(x, y, size, size);
+      x += size;
     }
     white = !firstWhite;
     x = 0;
-    y += 20;
+    y += size;
   }
 };
 

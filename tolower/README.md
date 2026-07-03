@@ -1,6 +1,6 @@
 # tolower
 
-tolower is the backend server for fax, an online drawing application.
+tolower is the backend server for phax, an online drawing application.
 
 ## How it works
 
