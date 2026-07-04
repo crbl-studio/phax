@@ -23,12 +23,12 @@
     function loop() {
       if (gs.renderer) {
         gs.renderer
-          .render(
-            gs.camera,
-            gs.showBackground,
-            height * window.devicePixelRatio,
-            width * window.devicePixelRatio,
-          )
+          .render({
+            camera: gs.camera,
+            showBackground: gs.showBackground,
+            viewportWidth: width * window.devicePixelRatio,
+            viewportHeight: height * window.devicePixelRatio,
+          })
           .then(() => {
             if (!cancelled) req = requestAnimationFrame(loop);
           });
