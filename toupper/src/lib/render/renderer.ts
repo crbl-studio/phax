@@ -38,6 +38,7 @@ export class Renderer {
   private previousBg: boolean = true;
   private squaresCanvas: OffscreenCanvas;
   private squaresInitialized = false;
+  private compositionCanvas: OffscreenCanvas;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -51,6 +52,7 @@ export class Renderer {
     this.inProgress = inProgress;
     this.onSnapshot = onSnapshot;
     this.squaresCanvas = new OffscreenCanvas(drawing.width, drawing.height);
+    this.compositionCanvas = new OffscreenCanvas(drawing.width, drawing.height);
   }
 
   async render(
@@ -98,17 +100,8 @@ export class Renderer {
       this.squaresInitialized = true;
     }
 
-    this.ctx.clearRect(0, 0, viewportWidth, viewportHeight);
-
-    if (bg) {
-      this.ctx.drawImage(
-        this.squaresCanvas,
-        camera.position.x,
-        camera.position.y,
-        this.drawing.width * ratio,
-        this.drawing.height * ratio,
-      );
-    }
+    const compCtx = this.compositionCanvas.getContext("2d")!;
+    compCtx.clearRect(0, 0, this.drawing.width, this.drawing.height);
 
     for (const layerName of this.drawing.layerOrder) {
       const layer = this.drawing.layers.get(layerName);
@@ -160,8 +153,14 @@ export class Renderer {
         this.strokeResumeStates.set(layerName, states);
       }
 
+      compCtx.drawImage(scratch, 0, 0);
+    }
+
+    this.ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+    if (bg) {
       this.ctx.drawImage(
-        scratch,
+        this.squaresCanvas,
         camera.position.x,
         camera.position.y,
         this.drawing.width * ratio,
@@ -169,12 +168,26 @@ export class Renderer {
       );
     }
 
+    this.ctx.drawImage(
+      this.compositionCanvas,
+      camera.position.x,
+      camera.position.y,
+      this.drawing.width * ratio,
+      this.drawing.height * ratio,
+    );
+
     this.lastRenderMetadataHash = drawingMetadataHash;
     this.storeInProgressHashes();
   }
 
-  getPNG(): string {
-    return this.canvas.toDataURL("image/png");
+  async getPNG(): Promise<string> {
+    const blob = await this.compositionCanvas.convertToBlob();
+    return await this.blobToDataUrl(blob);
+  }
+
+  getPixelAt(x: number, y: number): ImageData {
+    const compCtx = this.compositionCanvas.getContext("2d")!;
+    return compCtx.getImageData(Math.round(x), Math.round(y), 1, 1);
   }
 
   getLayerCanvas(layer: string): { canvas: OffscreenCanvas; renderID: string } | undefined {

@@ -112,7 +112,7 @@
     gs.tool = new BucketTool(null);
   })}
   {@render icon("pipette", gs.tool?.getToolType() === ToolType.PickColor, () => {
-    gs.tool = new ColorPickerTool(gs.canvas);
+    gs.tool = new ColorPickerTool(null);
   })}
   {@render icon("select", gs.tool?.getToolType() === ToolType.Select, () => {
     gs.tool = new SelectionTool(null);
@@ -183,10 +183,10 @@
       }
     })}
   {/if}
-  {@render icon("export", false, () => {
+  {@render icon("export", false, async () => {
     if (gs.renderer) {
       const w = window.open("about:blank")!;
-      w.location = gs.renderer.getPNG();
+      w.location = await gs.renderer.getPNG();
     }
   })}
   <!-- svelte-ignore a11y_consider_explicit_label -->
