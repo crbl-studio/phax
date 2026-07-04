@@ -3,7 +3,7 @@ import type { CameraState, InProgressEntry } from "$lib/state.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import {
   applyInstruction,
-  compositeStroke,
+  applyStrokeCanvas,
   resumeStroke,
   type StrokeResumeState,
 } from "./instruction";
@@ -21,7 +21,7 @@ export class Renderer {
   readonly drawing: Drawing;
   readonly imageCache = new SvelteMap<string, HTMLImageElement>();
   // Layer => UUID => entry
-  private inProgress: Map<string, Map<string, InProgressEntry>>;
+  private inProgressInstructions: Map<string, Map<string, InProgressEntry>>;
   // Layer => History index => data
   private layerHistoryCanvases = new SvelteMap<
     string,
@@ -38,7 +38,7 @@ export class Renderer {
   private previousCameraState: CameraState | null = null;
   private previousViewportHeight: number = 0;
   private previousViewportWidth: number = 0;
-  private previousBg: boolean = true;
+  private previousShowBackground: boolean = true;
   private squaresCanvas: OffscreenCanvas;
   private squaresInitialized = false;
   private compositionCanvas: OffscreenCanvas;
@@ -46,13 +46,13 @@ export class Renderer {
   constructor(
     canvas: HTMLCanvasElement,
     drawing: Drawing,
-    inProgress: Map<string, Map<string, InProgressEntry>>,
+    inProgressInstructions: Map<string, Map<string, InProgressEntry>>,
     onSnapshot?: SnapshotCallback,
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     this.drawing = drawing;
-    this.inProgress = inProgress;
+    this.inProgressInstructions = inProgressInstructions;
     this.onSnapshot = onSnapshot;
     this.squaresCanvas = new OffscreenCanvas(drawing.width, drawing.height);
     this.compositionCanvas = new OffscreenCanvas(drawing.width, drawing.height);
@@ -60,33 +60,33 @@ export class Renderer {
 
   async render(
     camera: CameraState,
-    bg: boolean,
+    showBackground: boolean,
     viewportHeight: number,
     viewportWidth: number,
   ): Promise<void> {
     const ratio = camera.zoom / 100;
-    let updates = false;
+    let needsRerender = false;
     for (const [layerName, layer] of this.drawing.layers) {
       if (!layer.visible) continue;
       if (!this.layerHistoryCanvases.get(layerName)?.has(layer.historyIndex)) {
-        updates = true;
+        needsRerender = true;
         break;
       }
     }
     const drawingMetadataHash = this.getDrawingMetadataHash();
-    if (this.lastRenderMetadataHash != drawingMetadataHash) updates = true;
+    if (this.lastRenderMetadataHash != drawingMetadataHash) needsRerender = true;
     if (
       !this.previousCameraState ||
       this.previousCameraState.zoom !== camera.zoom ||
       this.previousCameraState.position.x !== camera.position.x ||
       this.previousCameraState.position.y !== camera.position.y
     )
-      updates = true;
-    if (this.previousViewportHeight !== viewportHeight) updates = true;
-    if (this.previousViewportWidth !== viewportWidth) updates = true;
-    if (this.previousBg !== bg) updates = true;
-    if (!updates) updates = this.inProgressChanged();
-    if (!updates) return;
+      needsRerender = true;
+    if (this.previousViewportHeight !== viewportHeight) needsRerender = true;
+    if (this.previousViewportWidth !== viewportWidth) needsRerender = true;
+    if (this.previousShowBackground !== showBackground) needsRerender = true;
+    if (!needsRerender) needsRerender = this.inProgressChanged();
+    if (!needsRerender) return;
     console.log("rendering");
 
     this.previousCameraState = {
@@ -96,15 +96,15 @@ export class Renderer {
     };
     this.previousViewportHeight = viewportHeight;
     this.previousViewportWidth = viewportWidth;
-    this.previousBg = bg;
+    this.previousShowBackground = showBackground;
 
     if (!this.squaresInitialized) {
       drawSquares(this.squaresCanvas.getContext("2d")!);
       this.squaresInitialized = true;
     }
 
-    const compCtx = this.compositionCanvas.getContext("2d")!;
-    compCtx.clearRect(0, 0, this.drawing.width, this.drawing.height);
+    const compositionCtx = this.compositionCanvas.getContext("2d")!;
+    compositionCtx.clearRect(0, 0, this.drawing.width, this.drawing.height);
 
     for (const layerName of this.drawing.layerOrder) {
       const layerCanvas = new OffscreenCanvas(this.drawing.width, this.drawing.height);
@@ -114,12 +114,12 @@ export class Renderer {
 
       await this.ensureLayerContext(layerName, layer.historyIndex);
       const historyCanvas = this.getCanvas(layerName, layer.historyIndex)!;
-      const inProgress = this.inProgress.get(layerName);
+      const inProgressInstructions = this.inProgressInstructions.get(layerName);
 
       layerCtx.drawImage(historyCanvas, 0, 0);
 
-      if (inProgress) {
-        for (const [uuid, entry] of inProgress) {
+      if (inProgressInstructions) {
+        for (const [uuid, entry] of inProgressInstructions) {
           if (!entry.instructionBox.applied) continue;
           const instruction = entry.instructionBox.instruction;
           let inProgressCanvas = this.inProgressCanvases.get(uuid);
@@ -129,23 +129,23 @@ export class Renderer {
           }
           const inProgressCtx = inProgressCanvas.getContext("2d")!;
           if ("points" in instruction) {
-            const prev = this.strokeResumeStates.get(uuid);
-            if (prev && instruction.points.length === prev.pointCount) {
+            const prevResumeState = this.strokeResumeStates.get(uuid);
+            if (prevResumeState && instruction.points.length === prevResumeState.pointCount) {
               continue;
             }
-            if (prev && instruction.points.length > prev.pointCount) {
-              const next = resumeStroke(instruction, inProgressCtx, prev);
-              this.strokeResumeStates.set(uuid, next);
+            let resumeState: StrokeResumeState;
+            if (prevResumeState && instruction.points.length > prevResumeState.pointCount) {
+              resumeState = resumeStroke(instruction, inProgressCtx, prevResumeState);
             } else {
-              const next = resumeStroke(instruction, inProgressCtx, {
+              resumeState = resumeStroke(instruction, inProgressCtx, {
                 lastDrawDistance: 0,
                 segmentIndex: 0,
                 segmentStartDistance: 0,
                 pointCount: 0,
               });
-              this.strokeResumeStates.set(uuid, next);
             }
-            compositeStroke(instruction.brush, inProgressCanvas, layerCtx);
+            this.strokeResumeStates.set(uuid, resumeState);
+            applyStrokeCanvas(instruction.brush, inProgressCanvas, layerCtx);
           } else {
             await applyInstruction(instruction, inProgressCtx, this.imageCache);
             layerCtx.globalCompositeOperation = "source-over";
@@ -154,13 +154,13 @@ export class Renderer {
         }
       }
 
-      compCtx.drawImage(layerCanvas, 0, 0);
+      compositionCtx.drawImage(layerCanvas, 0, 0);
     }
 
     this.ctx.clearRect(0, 0, viewportWidth, viewportHeight);
     this.ctx.imageSmoothingEnabled = false;
 
-    if (bg) {
+    if (showBackground) {
       this.ctx.drawImage(
         this.squaresCanvas,
         camera.position.x,
@@ -198,12 +198,12 @@ export class Renderer {
     return this.layerHistoryCanvases.get(layer)?.get(historyIndex);
   }
 
-  setSnapshotCallback(cb: SnapshotCallback): void {
-    this.onSnapshot = cb;
+  setSnapshotCallback(callback: SnapshotCallback): void {
+    this.onSnapshot = callback;
   }
 
-  invalidateFrom(layer: string, index: number): void {
-    const layerHistory = this.layerHistoryCanvases.get(layer);
+  invalidateFrom(layerName: string, index: number): void {
+    const layerHistory = this.layerHistoryCanvases.get(layerName);
     if (!layerHistory) return;
     const keysToDelete = [];
     for (const key of layerHistory.keys()) {
@@ -214,8 +214,8 @@ export class Renderer {
     for (const key of keysToDelete) {
       layerHistory.delete(key);
     }
-    this.strokeResumeStates.delete(layer);
-    this.inProgressCanvases.delete(layer);
+    this.strokeResumeStates.delete(layerName);
+    this.inProgressCanvases.delete(layerName);
   }
 
   private getDrawingMetadataHash(): string {
@@ -240,11 +240,8 @@ export class Renderer {
       return;
     }
 
-    const w = this.drawing.width;
-    const h = this.drawing.height;
-
     if (!contexts.has(0)) {
-      const ctx = new OffscreenCanvas(w, h).getContext("2d")!;
+      const ctx = new OffscreenCanvas(this.drawing.width, this.drawing.height).getContext("2d")!;
       contexts.set(0, { canvas: ctx.canvas, renderID: uuid() });
     }
 
@@ -258,8 +255,8 @@ export class Renderer {
     const snapshot = this.drawing.getSnapshotBefore(layerName, targetIndex);
     if (snapshot && snapshot[0] > currentIndex && snapshot[0] <= targetIndex) {
       const image = await this.loadImage(snapshot[1]);
-      const ctx = new OffscreenCanvas(w, h).getContext("2d")!;
-      ctx.clearRect(0, 0, w, h);
+      const ctx = new OffscreenCanvas(this.drawing.width, this.drawing.height).getContext("2d")!;
+      ctx.clearRect(0, 0, this.drawing.width, this.drawing.height);
       ctx.drawImage(image, 0, 0);
       contexts.set(snapshot[0], { canvas: ctx.canvas, renderID: uuid() });
       currentIndex = snapshot[0];
@@ -271,8 +268,8 @@ export class Renderer {
       currentIndex,
       targetIndex,
       contexts,
-      w,
-      h,
+      this.drawing.width,
+      this.drawing.height
     );
   }
 
@@ -285,13 +282,13 @@ export class Renderer {
     w: number,
     h: number,
   ): Promise<void> {
-    let current = from;
+    let currentIndex = from;
 
     for (let i = from; i < to; i++) {
       const instructionBox = history[i];
       if (!instructionBox) break;
 
-      const prevContext = contexts.get(current)!;
+      const prevContext = contexts.get(currentIndex)!;
       const newCanvas = new OffscreenCanvas(w, h);
       const newCtx = newCanvas.getContext("2d")!;
       newCtx.drawImage(prevContext.canvas, 0, 0);
@@ -300,24 +297,24 @@ export class Renderer {
         await applyInstruction(instructionBox.instruction, newCtx, this.imageCache);
       }
 
-      current++;
+      currentIndex++;
 
       for (const key of contexts.keys()) {
-        if (key > current) {
+        if (key > currentIndex) {
           contexts.delete(key);
         }
       }
 
-      contexts.set(current, { canvas: newCanvas, renderID: uuid() });
+      contexts.set(currentIndex, { canvas: newCanvas, renderID: uuid() });
 
-      if (current % SNAPSHOT_INTERVAL === 0 && this.onSnapshot) {
+      if (currentIndex % SNAPSHOT_INTERVAL === 0 && this.onSnapshot) {
         const blob = await newCanvas.convertToBlob();
-        const data = await this.blobToDataUrl(blob);
-        this.onSnapshot(layerName, data, current);
+        const dataUrl = await this.blobToDataUrl(blob);
+        this.onSnapshot(layerName, dataUrl, currentIndex);
       }
     }
 
-    this.trimHistoryCanvases(layerName, current);
+    this.trimHistoryCanvases(layerName, currentIndex);
   }
 
   private trimHistoryCanvases(layerName: string, maxIndex: number): void {
@@ -374,7 +371,7 @@ export class Renderer {
   }
 
   private inProgressChanged(): boolean {
-    for (const [layerName, inProgress] of this.inProgress) {
+    for (const [layerName, inProgress] of this.inProgressInstructions) {
       const layerHashes = this.inProgressHashes.get(layerName);
       if (!layerHashes) {
         if (inProgress.size > 0) return true;
@@ -393,7 +390,7 @@ export class Renderer {
       }
     }
     for (const layerName of this.inProgressHashes.keys()) {
-      if (!this.inProgress.has(layerName)) {
+      if (!this.inProgressInstructions.has(layerName)) {
         return true;
       }
     }
@@ -402,7 +399,7 @@ export class Renderer {
 
   private storeInProgressHashes(): void {
     this.inProgressHashes.clear();
-    for (const [layerName, inProgress] of this.inProgress) {
+    for (const [layerName, inProgress] of this.inProgressInstructions) {
       const layerHashes = new Map<string, string>();
       for (const [uuid, entry] of inProgress) {
         layerHashes.set(uuid, this.hashInstruction(entry.instructionBox));

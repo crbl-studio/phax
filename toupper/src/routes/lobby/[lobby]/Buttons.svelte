@@ -123,8 +123,8 @@
   {@render icon("move", gs.tool?.getToolType() === ToolType.Move, () => {
     gs.tool = new MoveTool(null);
   })}
-  {@render icon("background", gs.bg, () => {
-    gs.bg = !gs.bg;
+  {@render icon("background", gs.showBackground, () => {
+    gs.showBackground = !gs.showBackground;
   })}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->

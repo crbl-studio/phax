@@ -16,17 +16,17 @@ const generateShape = (brush: Brush): OffscreenCanvas => {
   const canvas = new OffscreenCanvas(brush.width, brush.width);
   const context = canvas.getContext("2d")!;
   const color = strToRgb(brush.color);
-  const full = rgboToStr(color.r, color.g, color.b, U32_MAX);
+  const fullOpacityColor = rgboToStr(color.r, color.g, color.b, U32_MAX);
   context.lineCap = "round";
   context.lineJoin = "round";
   context.lineWidth = brush.width;
   if (brush.brushShape.shape === "circle") {
     const radius = brush.width / 2;
     if (u32ToPercentage(brush.hardness) === 100) {
-      context.fillStyle = full;
+      context.fillStyle = fullOpacityColor;
     } else {
       const grad = context.createRadialGradient(radius, radius, 0, radius, radius, radius);
-      grad.addColorStop(brush.hardness / U32_MAX, full);
+      grad.addColorStop(brush.hardness / U32_MAX, fullOpacityColor);
       grad.addColorStop(1, rgboToStr(color.r, color.g, color.b, 0));
       context.fillStyle = grad;
     }
@@ -87,18 +87,18 @@ export const resumeStroke = (
   }
 
   let nextDrawDistance = state.lastDrawDistance + spacing;
-  let segStart = state.segmentStartDistance;
+  let segmentStart = state.segmentStartDistance;
   let segmentIndex = state.segmentIndex;
 
   for (let i = segmentIndex; i < stroke.points.length - 1; i++) {
     const segLen = Math.max(getDistance(stroke.points[i], stroke.points[i + 1]), 1);
-    const segEnd = segStart + segLen;
+    const segEnd = segmentStart + segLen;
 
     while (nextDrawDistance <= segEnd) {
       const position = getPointOnSegment(
         stroke.points[i],
         stroke.points[i + 1],
-        nextDrawDistance - segStart,
+        nextDrawDistance - segmentStart,
       );
       context.drawImage(
         brushImage,
@@ -108,14 +108,14 @@ export const resumeStroke = (
       nextDrawDistance += spacing;
     }
 
-    segStart = segEnd;
+    segmentStart = segEnd;
     segmentIndex = i + 1;
   }
 
   return {
     lastDrawDistance: nextDrawDistance - spacing,
     segmentIndex,
-    segmentStartDistance: segStart,
+    segmentStartDistance: segmentStart,
     pointCount: stroke.points.length,
   };
 };

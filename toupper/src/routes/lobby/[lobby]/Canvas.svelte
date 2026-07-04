@@ -25,7 +25,7 @@
         gs.renderer
           .render(
             gs.camera,
-            gs.bg,
+            gs.showBackground,
             height * window.devicePixelRatio,
             width * window.devicePixelRatio,
           )

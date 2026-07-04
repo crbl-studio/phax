@@ -26,7 +26,7 @@ interface GlobalState {
   camera: CameraState;
   server: Server | null;
   selectedLayer: string | null;
-  bg: boolean;
+  showBackground: boolean;
   hoveredInstruction: InstructionBox | null;
   draggedInstruction: number | null;
   tool: Tool | null;
@@ -56,7 +56,7 @@ export const gs: GlobalState = $state({
   },
   server: null,
   selectedLayer: null,
-  bg: true,
+  showBackground: true,
   hoveredInstruction: null,
   draggedInstruction: null,
   tool: null,
