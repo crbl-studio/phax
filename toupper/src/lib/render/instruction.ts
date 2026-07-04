@@ -38,6 +38,13 @@ const generateShape = (brush: Brush): OffscreenCanvas => {
   } else {
     context.fillRect(0, 0, brush.width, brush.width);
   }
+  const imageData = context.getImageData(0, 0, brush.width, brush.width);
+  for (let i = 0; i < imageData.data.length; i += 4) {
+    imageData.data[i] = color.r;
+    imageData.data[i+1] = color.g;
+    imageData.data[i+2] = color.b;
+  }
+  context.putImageData(imageData, 0, 0);
   return canvas;
 };
 
@@ -73,6 +80,7 @@ export const resumeStroke = (
   } else {
     context.globalCompositeOperation = "source-over";
   }
+  context.imageSmoothingEnabled = false;
 
   const brushImage = generateShape(stroke.brush);
   const spacing = Math.max((stroke.brush.repeat * stroke.brush.width) / (2 ** 32 - 1), 1);
