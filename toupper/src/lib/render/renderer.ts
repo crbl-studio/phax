@@ -157,6 +157,7 @@ export class Renderer {
     }
 
     this.ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+    this.ctx.imageSmoothingEnabled = false;
 
     if (bg) {
       this.ctx.drawImage(

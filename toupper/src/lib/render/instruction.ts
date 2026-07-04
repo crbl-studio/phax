@@ -7,7 +7,7 @@ import type {
   Point,
   Stroke,
 } from "$lib/drinfo";
-import { rgboToStr, strToRgb, getDistance } from "$lib/util";
+import { rgboToStr, strToRgb, getDistance, u32ToPercentage } from "$lib/util";
 import { drawImage } from "./draw";
 
 const generateShape = (brush: Brush): OffscreenCanvas => {
@@ -21,13 +21,18 @@ const generateShape = (brush: Brush): OffscreenCanvas => {
   context.lineWidth = brush.width;
   if (brush.brushShape.shape === "circle") {
     const radius = brush.width / 2;
-    const grad = context.createRadialGradient(radius, radius, 0, radius, radius, radius);
-    grad.addColorStop(
-      brush.hardness / (2 ** 32 - 1),
-      rgboToStr(color.r, color.g, color.b, brush.opacity),
-    );
-    grad.addColorStop(1, rgboToStr(color.r, color.g, color.b, 0));
-    context.fillStyle = grad;
+    const brushColorStr = rgboToStr(color.r, color.g, color.b, brush.opacity);
+    if (u32ToPercentage(brush.hardness) === 100) {
+      context.fillStyle = brushColorStr;
+    } else {
+      const grad = context.createRadialGradient(radius, radius, 0, radius, radius, radius);
+      grad.addColorStop(
+        brush.hardness / (2 ** 32 - 1),
+        rgboToStr(color.r, color.g, color.b, brush.opacity),
+      );
+      grad.addColorStop(1, rgboToStr(color.r, color.g, color.b, 0));
+      context.fillStyle = grad;
+    }
     context.arc(radius, radius, radius, 0, Math.PI * 2);
     context.fill();
   } else {
