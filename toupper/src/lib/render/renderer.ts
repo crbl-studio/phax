@@ -1,7 +1,12 @@
 import type { Drawing, InstructionBox } from "$lib/drinfo";
 import type { CameraState, InProgressEntry } from "$lib/state.svelte";
 import { SvelteMap } from "svelte/reactivity";
-import { applyInstruction, resumeStroke, type StrokeResumeState } from "./instruction";
+import {
+  applyInstruction,
+  compositeStroke,
+  resumeStroke,
+  type StrokeResumeState,
+} from "./instruction";
 import { v4 as uuid } from "uuid";
 import { drawSquares } from "./draw";
 
@@ -22,12 +27,10 @@ export class Renderer {
     string,
     Map<number, { canvas: OffscreenCanvas; renderID: string }>
   >();
-  // Rendered layer + in progress instructions.
-  private scratchCanvases = new Map<string, OffscreenCanvas>();
-  // renderID of the history canvas the scratch was last built from.
-  private scratchSourceRenderID = new Map<string, string>();
-  // Layer => UUID => resume state
-  private strokeResumeStates = new Map<string, Map<string, StrokeResumeState>>();
+  // UUID => resume state
+  private strokeResumeStates = new Map<string, StrokeResumeState>();
+  // UUID => stroke canvas
+  private inProgressCanvases = new Map<string, OffscreenCanvas>();
   // Layer => UUID => hash of instruction at time of last render
   private inProgressHashes = new Map<string, Map<string, string>>();
   private onSnapshot?: SnapshotCallback;
@@ -104,56 +107,54 @@ export class Renderer {
     compCtx.clearRect(0, 0, this.drawing.width, this.drawing.height);
 
     for (const layerName of this.drawing.layerOrder) {
+      const layerCanvas = new OffscreenCanvas(this.drawing.width, this.drawing.height);
+      const layerCtx = layerCanvas.getContext("2d")!;
       const layer = this.drawing.layers.get(layerName);
       if (!layer || !layer.visible) continue;
 
       await this.ensureLayerContext(layerName, layer.historyIndex);
-      const historyCanvas = this.getCanvas(layerName, layer.historyIndex);
-      const historyRenderID =
-        this.layerHistoryCanvases.get(layerName)?.get(layer.historyIndex)?.renderID ?? "";
+      const historyCanvas = this.getCanvas(layerName, layer.historyIndex)!;
       const inProgress = this.inProgress.get(layerName);
 
-      const scratch = this.getScratchFor(
-        layerName,
-        historyCanvas,
-        historyRenderID,
-        inProgress,
-        this.drawing.width,
-        this.drawing.height,
-      );
-      const scratchCtx = scratch.getContext("2d")!;
+      layerCtx.drawImage(historyCanvas, 0, 0);
 
       if (inProgress) {
-        const states = this.strokeResumeStates.get(layerName) ?? new Map();
         for (const [uuid, entry] of inProgress) {
           if (!entry.instructionBox.applied) continue;
           const instruction = entry.instructionBox.instruction;
+          let inProgressCanvas = this.inProgressCanvases.get(uuid);
+          if (!inProgressCanvas) {
+            inProgressCanvas = new OffscreenCanvas(this.drawing.width, this.drawing.height);
+            this.inProgressCanvases.set(uuid, inProgressCanvas);
+          }
+          const inProgressCtx = inProgressCanvas.getContext("2d")!;
           if ("points" in instruction) {
-            const prev = states.get(uuid);
-            const newLen = instruction.points.length;
-            if (prev && newLen === prev.pointCount) {
+            const prev = this.strokeResumeStates.get(uuid);
+            if (prev && instruction.points.length === prev.pointCount) {
               continue;
             }
-            if (prev && newLen > prev.pointCount) {
-              const next = resumeStroke(instruction, scratchCtx, prev);
-              states.set(uuid, next);
+            if (prev && instruction.points.length > prev.pointCount) {
+              const next = resumeStroke(instruction, inProgressCtx, prev);
+              this.strokeResumeStates.set(uuid, next);
             } else {
-              const next = resumeStroke(instruction, scratchCtx, {
+              const next = resumeStroke(instruction, inProgressCtx, {
                 lastDrawDistance: 0,
                 segmentIndex: 0,
                 segmentStartDistance: 0,
                 pointCount: 0,
               });
-              states.set(uuid, next);
+              this.strokeResumeStates.set(uuid, next);
             }
+            compositeStroke(instruction.brush, inProgressCanvas, layerCtx);
           } else {
-            await applyInstruction(instruction, scratchCtx, this.imageCache);
+            await applyInstruction(instruction, inProgressCtx, this.imageCache);
+            layerCtx.globalCompositeOperation = "source-over";
+            layerCtx.drawImage(inProgressCanvas, 0, 0);
           }
         }
-        this.strokeResumeStates.set(layerName, states);
       }
 
-      compCtx.drawImage(scratch, 0, 0);
+      compCtx.drawImage(layerCanvas, 0, 0);
     }
 
     this.ctx.clearRect(0, 0, viewportWidth, viewportHeight);
@@ -213,55 +214,8 @@ export class Renderer {
     for (const key of keysToDelete) {
       layerHistory.delete(key);
     }
-    this.scratchCanvases.delete(layer);
-    this.scratchSourceRenderID.delete(layer);
     this.strokeResumeStates.delete(layer);
-  }
-
-  private getScratchFor(
-    layerName: string,
-    historyCanvas: OffscreenCanvas | null,
-    historyRenderID: string,
-    inProgress: Map<string, InProgressEntry> | undefined,
-    w: number,
-    h: number,
-  ): OffscreenCanvas {
-    const existing = this.scratchCanvases.get(layerName);
-    let needsReinit = false;
-    if (!existing || existing.width !== w || existing.height !== h) needsReinit = true;
-    if (this.scratchSourceRenderID.get(layerName) !== historyRenderID) needsReinit = true;
-
-    if (inProgress && !needsReinit) {
-      const states = this.strokeResumeStates.get(layerName);
-      for (const [uuid, entry] of inProgress) {
-        if (!entry.instructionBox.applied) continue;
-        const instruction = entry.instructionBox.instruction;
-        if ("points" in instruction) {
-          const prev = states?.get(uuid);
-          if (prev && instruction.points.length < prev.pointCount) {
-            needsReinit = true;
-            break;
-          }
-        } else {
-          needsReinit = true;
-          break;
-        }
-      }
-    }
-
-    if (!needsReinit) return existing!;
-
-    const canvas =
-      existing && existing.width === w && existing.height === h
-        ? existing
-        : new OffscreenCanvas(w, h);
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, w, h);
-    if (historyCanvas) ctx.drawImage(historyCanvas, 0, 0);
-    this.scratchCanvases.set(layerName, canvas);
-    this.scratchSourceRenderID.set(layerName, historyRenderID);
-    this.strokeResumeStates.set(layerName, new Map());
-    return canvas;
+    this.inProgressCanvases.delete(layer);
   }
 
   private getDrawingMetadataHash(): string {

@@ -3,6 +3,7 @@ export { drawSquares, drawImage } from "./draw";
 export {
   stroke,
   resumeStroke,
+  applyStrokeCanvas as compositeStroke,
   type StrokeResumeState,
   motion,
   insertImage,

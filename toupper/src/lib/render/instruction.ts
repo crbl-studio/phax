@@ -10,26 +10,23 @@ import type {
 import { rgboToStr, strToRgb, getDistance, u32ToPercentage } from "$lib/util";
 import { drawImage } from "./draw";
 
+const U32_MAX = 2 ** 32 - 1;
+
 const generateShape = (brush: Brush): OffscreenCanvas => {
   const canvas = new OffscreenCanvas(brush.width, brush.width);
   const context = canvas.getContext("2d")!;
   const color = strToRgb(brush.color);
-  context.strokeStyle = rgboToStr(color.r, color.g, color.b, brush.opacity);
-  context.fillStyle = rgboToStr(color.r, color.g, color.b, brush.opacity);
+  const full = rgboToStr(color.r, color.g, color.b, U32_MAX);
   context.lineCap = "round";
   context.lineJoin = "round";
   context.lineWidth = brush.width;
   if (brush.brushShape.shape === "circle") {
     const radius = brush.width / 2;
-    const brushColorStr = rgboToStr(color.r, color.g, color.b, brush.opacity);
     if (u32ToPercentage(brush.hardness) === 100) {
-      context.fillStyle = brushColorStr;
+      context.fillStyle = full;
     } else {
       const grad = context.createRadialGradient(radius, radius, 0, radius, radius, radius);
-      grad.addColorStop(
-        brush.hardness / (2 ** 32 - 1),
-        rgboToStr(color.r, color.g, color.b, brush.opacity),
-      );
+      grad.addColorStop(brush.hardness / U32_MAX, full);
       grad.addColorStop(1, rgboToStr(color.r, color.g, color.b, 0));
       context.fillStyle = grad;
     }
@@ -41,8 +38,8 @@ const generateShape = (brush: Brush): OffscreenCanvas => {
   const imageData = context.getImageData(0, 0, brush.width, brush.width);
   for (let i = 0; i < imageData.data.length; i += 4) {
     imageData.data[i] = color.r;
-    imageData.data[i+1] = color.g;
-    imageData.data[i+2] = color.b;
+    imageData.data[i + 1] = color.g;
+    imageData.data[i + 2] = color.b;
   }
   context.putImageData(imageData, 0, 0);
   return canvas;
@@ -75,15 +72,11 @@ export const resumeStroke = (
   }
   if (stroke.points.length === 0) return state;
 
-  if (stroke.brush.erase) {
-    context.globalCompositeOperation = "destination-out";
-  } else {
-    context.globalCompositeOperation = "source-over";
-  }
+  context.globalCompositeOperation = "source-over";
   context.imageSmoothingEnabled = false;
 
   const brushImage = generateShape(stroke.brush);
-  const spacing = Math.max((stroke.brush.repeat * stroke.brush.width) / (2 ** 32 - 1), 1);
+  const spacing = Math.max((stroke.brush.repeat * stroke.brush.width) / U32_MAX, 1);
 
   if (state.pointCount === 0) {
     context.drawImage(
@@ -119,7 +112,6 @@ export const resumeStroke = (
     segmentIndex = i + 1;
   }
 
-  context.globalCompositeOperation = "source-over";
   return {
     lastDrawDistance: nextDrawDistance - spacing,
     segmentIndex,
@@ -128,16 +120,34 @@ export const resumeStroke = (
   };
 };
 
+export const applyStrokeCanvas = (
+  brush: Brush,
+  buffer: OffscreenCanvas,
+  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+): void => {
+  const opacity = brush.opacity / U32_MAX;
+  if (opacity <= 0) return;
+  context.save();
+  context.globalAlpha = opacity;
+  context.globalCompositeOperation = brush.erase ? "destination-out" : "source-over";
+  context.imageSmoothingEnabled = false;
+  context.drawImage(buffer, 0, 0);
+  context.restore();
+};
+
 export const stroke = (
   stroke: Stroke,
   context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
 ) => {
-  resumeStroke(stroke, context, {
+  const buffer = new OffscreenCanvas(context.canvas.width, context.canvas.height);
+  const bufferCtx = buffer.getContext("2d")!;
+  resumeStroke(stroke, bufferCtx, {
     lastDrawDistance: 0,
     segmentIndex: 0,
     segmentStartDistance: 0,
     pointCount: 0,
   });
+  applyStrokeCanvas(stroke.brush, buffer, context);
 };
 
 const traceSelection = (
