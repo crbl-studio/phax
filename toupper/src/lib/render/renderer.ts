@@ -235,7 +235,7 @@ export class Renderer {
             });
           }
           this.strokeResumeStates.set(uuid, resumeState);
-          applyStrokeCanvas(instruction.brush, strokeCanvas, layerCtx);
+          applyStrokeCanvas(instruction.brush, strokeCanvas, layerCtx, instruction.selection);
         } else {
           await applyInstruction(instruction, layerCtx, this.imageCache);
         }

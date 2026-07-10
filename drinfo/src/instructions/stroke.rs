@@ -6,11 +6,13 @@ use serde::{Deserialize, Serialize};
 pub struct Stroke {
     points: Vec<Point>,
     brush: Brush,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selection: Option<Vec<Point>>,
 }
 
 impl Stroke {
-    pub fn new(points: Vec<Point>, brush: Brush) -> Self {
-        Stroke { points, brush }
+    pub fn new(points: Vec<Point>, brush: Brush, selection: Option<Vec<Point>>) -> Self {
+        Stroke { points, brush, selection }
     }
 
     pub fn len(&self) -> usize {
@@ -34,5 +36,10 @@ impl Stroke {
     /// Adds a new point to the stroke.
     pub fn add_point(&mut self, point: Point) {
         self.points.push(point);
+    }
+
+    /// Sets the stroke's selection polygon.
+    pub fn set_selection(&mut self, selection: Vec<Point>) {
+        self.selection = Some(selection);
     }
 }

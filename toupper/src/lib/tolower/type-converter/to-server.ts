@@ -77,12 +77,16 @@ export class ToServer {
   }
 
   static stroke(stroke: DrInFo.Stroke): Stroke {
-    return {
+    const result: Stroke = {
       Stroke: {
         brush: ToServer.brush(stroke.brush),
         points: stroke.points,
       },
     };
+    if (stroke.selection) {
+      result.Stroke.selection = stroke.selection;
+    }
+    return result;
   }
 
   static motion(motion: DrInFo.Motion): Motion {

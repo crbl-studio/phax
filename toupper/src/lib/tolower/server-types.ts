@@ -31,6 +31,7 @@ export type Stroke = {
   Stroke: {
     points: Point[];
     brush: Brush;
+    selection?: Point[];
   };
 };
 

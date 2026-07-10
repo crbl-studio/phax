@@ -55,6 +55,7 @@ export class FromServer {
     return {
       brush: FromServer.brush(stroke.brush),
       points: stroke.points,
+      selection: stroke.selection,
     };
   }
 

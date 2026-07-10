@@ -37,12 +37,16 @@ export class StrokeTool extends BaseTool {
     super.onmousedown(event, element);
     if (event.button !== 0) return;
     if (!gs.selectedLayer) return;
+    const selection = gs.selections.get(gs.username);
     const instructionBox = {
       uuid: uuid(),
       applied: true,
       instruction: {
         points: [],
         brush: gs.brush,
+        ...(selection?.closed && selection.points.length >= 3
+          ? { selection: selection.points }
+          : {}),
       },
     };
     gs.currentUuid = instructionBox.uuid;

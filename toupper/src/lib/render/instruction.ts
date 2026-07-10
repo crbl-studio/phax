@@ -124,6 +124,7 @@ export const applyStrokeCanvas = (
   brush: Brush,
   buffer: OffscreenCanvas,
   context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  selection?: Point[],
 ): void => {
   const opacity = brush.opacity / U32_MAX;
   if (opacity <= 0) return;
@@ -131,6 +132,10 @@ export const applyStrokeCanvas = (
   context.globalAlpha = opacity;
   context.globalCompositeOperation = brush.erase ? "destination-out" : "source-over";
   context.imageSmoothingEnabled = false;
+  if (selection && selection.length >= 3) {
+    traceSelectionPath(selection, context);
+    context.clip();
+  }
   context.drawImage(buffer, 0, 0);
   context.restore();
 };
@@ -147,17 +152,18 @@ export const stroke = (
     segmentStartDistance: 0,
     pointCount: 0,
   });
-  applyStrokeCanvas(stroke.brush, buffer, context);
+  applyStrokeCanvas(stroke.brush, buffer, context, stroke.selection);
 };
 
-const traceSelection = (
-  motion: Motion,
+const traceSelectionPath = (
+  points: Point[],
   context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
 ) => {
+  if (points.length < 3) return;
   context.beginPath();
-  context.moveTo(motion.selection[0].x, motion.selection[0].y);
-  for (let i = 1; i < motion.selection.length; i++) {
-    context.lineTo(motion.selection[i].x, motion.selection[i].y);
+  context.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    context.lineTo(points[i].x, points[i].y);
   }
   context.closePath();
 };
@@ -179,12 +185,12 @@ export const motion = (
 
   const tempCanvas = new OffscreenCanvas(context.canvas.width, context.canvas.height);
   const tempContext = tempCanvas.getContext("2d")!;
-  traceSelection(motion, tempContext);
+  traceSelectionPath(motion.selection, tempContext);
   tempContext.clip();
   tempContext.drawImage(context.canvas, 0, 0);
 
   context.globalCompositeOperation = "destination-out";
-  traceSelection(motion, context);
+  traceSelectionPath(motion.selection, context);
   context.fill();
 
   context.globalCompositeOperation = "source-over";

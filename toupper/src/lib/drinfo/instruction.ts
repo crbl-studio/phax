@@ -4,6 +4,7 @@ import type { Point } from "./point";
 export type Stroke = {
   points: Point[];
   brush: Brush;
+  selection?: Point[];
 };
 
 export type Motion = {

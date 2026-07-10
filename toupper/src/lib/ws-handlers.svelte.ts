@@ -112,9 +112,13 @@ export function registerWsHandlers(server: Server, username: string): void {
     const brush = FromServer.brush(data.brush);
     const existing = ip.get(data.uuid);
     if (!existing) {
+      const selection = gs.selections.get(data.username);
       const stroke: Stroke = {
         points: [data.start, data.end],
         brush,
+        ...(selection?.closed && selection.points.length >= 3
+          ? { selection: selection.points }
+          : {}),
       };
       ip.set(data.uuid, {
         instructionBox: { uuid: data.uuid, applied: true, instruction: stroke },
