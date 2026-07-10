@@ -102,20 +102,24 @@ export class ToServer {
   }
 
   static bucket(bucket: DrInFo.Bucket): Bucket {
-    return {
+    const result: Bucket = {
       Bucket: {
         point: bucket.point,
         brush: ToServer.brush(bucket.brush),
         tolerance: bucket.tolerance,
       },
     };
+    if (bucket.selection) {
+      result.Bucket.selection = bucket.selection;
+    }
+    return result;
   }
 
   static instruction(instruction: DrInFo.Instruction): Instruction {
     if ("points" in instruction) {
       return ToServer.stroke(instruction);
     }
-    if ("selection" in instruction) {
+    if ("selection" in instruction && "end" in instruction) {
       return ToServer.motion(instruction);
     }
     if ("base64" in instruction) {

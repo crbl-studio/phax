@@ -341,7 +341,18 @@ export const bucket = (
   for (const pixel of atTheEnd) {
     colorPixel(pixel);
   }
-  context.putImageData(imageData, 0, 0);
+  if (bucket.selection && bucket.selection.length >= 3) {
+    const tempCanvas = new OffscreenCanvas(context.canvas.width, context.canvas.height);
+    const tempCtx = tempCanvas.getContext("2d")!;
+    tempCtx.putImageData(imageData, 0, 0);
+    context.save();
+    traceSelectionPath(bucket.selection, context);
+    context.clip();
+    context.drawImage(tempCanvas, 0, 0);
+    context.restore();
+  } else {
+    context.putImageData(imageData, 0, 0);
+  }
 };
 
 export const applyInstruction = async (
@@ -351,7 +362,7 @@ export const applyInstruction = async (
 ) => {
   if ("points" in instruction) {
     stroke(instruction, context);
-  } else if ("selection" in instruction) {
+  } else if ("selection" in instruction && "end" in instruction) {
     motion(instruction, context);
   } else if ("point" in instruction && "base64" in instruction) {
     await insertImage(instruction, context, imageCache);

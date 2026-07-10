@@ -39,7 +39,7 @@ impl Stroke {
     }
 
     /// Sets the stroke's selection polygon.
-    pub fn set_selection(&mut self, selection: Vec<Point>) {
-        self.selection = Some(selection);
+    pub fn set_selection(&mut self, selection: Option<Vec<Point>>) {
+        self.selection = selection;
     }
 }

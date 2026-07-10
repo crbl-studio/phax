@@ -72,6 +72,7 @@ export class FromServer {
       point: bucket.point,
       brush: FromServer.brush(bucket.brush),
       tolerance: bucket.tolerance,
+      selection: bucket.selection,
     };
   }
 

@@ -25,6 +25,7 @@ export type Bucket = {
   point: Point;
   brush: Brush;
   tolerance: number;
+  selection?: Point[];
 };
 
 export type Instruction = Stroke | Motion | ImageInsertion | Bucket;

@@ -9,12 +9,16 @@ export class BucketTool extends BaseTool {
     if (!gs.selectedLayer) {
       return;
     }
+    const selection = gs.selections.get(gs.username);
     gs.server?.instructionBox(
       {
         instruction: {
           point: this.cursorPosition!,
           brush: gs.brush,
           tolerance: gs.tolerance,
+          ...(selection?.closed && selection.points.length >= 3
+            ? { selection: selection.points }
+            : {}),
         },
         uuid: uuid(),
         applied: true,

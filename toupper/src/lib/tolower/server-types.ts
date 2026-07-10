@@ -48,6 +48,7 @@ export type Bucket = {
     point: Point;
     brush: Brush;
     tolerance: number;
+    selection?: Point[];
   };
 };
 
